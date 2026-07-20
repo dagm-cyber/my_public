@@ -261,12 +261,14 @@ const Study = (() => {
   }
 
   function _renderViewPanel() {
-    const b = document.getElementById('study-browse');
-    const f = document.getElementById('study-flash');
-    const m = document.getElementById('study-map-panel');
-    if (b) b.style.display = _view === 'browse' ? '' : 'none';
-    if (f) f.style.display = _view === 'flash'  ? '' : 'none';
-    if (m) m.style.display = _view === 'map'    ? '' : 'none';
+    const b  = document.getElementById('study-browse');
+    const f  = document.getElementById('study-flash');
+    const m  = document.getElementById('study-map-panel');
+    const sc = document.getElementById('screen-study');
+    if (b)  b.style.display  = _view === 'browse' ? '' : 'none';
+    if (f)  f.style.display  = _view === 'flash'  ? '' : 'none';
+    if (m)  m.style.display  = _view === 'map'    ? '' : 'none';
+    if (sc) sc.classList.toggle('map-active', _view === 'map');
   }
 
   function _renderFilterOptions() {

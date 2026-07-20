@@ -1266,8 +1266,7 @@ body {
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
-  height: 460px;
-  max-height: calc(100vh - 280px);
+  height: calc(100vh - 260px);
   min-height: 300px;
 }
 
@@ -1282,6 +1281,24 @@ body {
   color: var(--text-faint);
   text-align: center;
   margin-bottom: 24px;
+}
+
+/* On PC: widen the content area and expand the map to fill it */
+@media (min-width: 768px) {
+  #screen-study.map-active .screen-content {
+    max-width: min(calc(100vw - 40px), 1100px);
+  }
+
+  /* Keep the header/tabs a sensible width */
+  #screen-study.map-active .screen-header,
+  #screen-study.map-active .study-mode-tabs,
+  #screen-study.map-active .study-view-row {
+    max-width: 508px;
+  }
+
+  #screen-study.map-active #study-map-panel {
+    height: calc(100vh - 185px);
+  }
 }
 
 /* Leaflet popup – dark theme */
@@ -1315,6 +1332,6 @@ body {
 
   #study-map-panel {
     height: calc(100vh - 270px);
-    min-height: 280px;
+    min-height: 260px;
   }
 }
