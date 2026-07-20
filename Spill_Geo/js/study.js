@@ -15,6 +15,13 @@ const Study = (() => {
   let _cardIndex    = 0;
   let _cardFlipped  = false;
 
+  // ── Map state ────────────────────────────────────────
+  let _studyMap      = null;
+  let _studyGeoLayer = null;
+  let _studyUSLayer  = null;
+  let _worldGeoJson  = null;
+  let _usGeoJson     = null;
+
   // ── Open ────────────────────────────────────────────────
 
   async function open() {
@@ -30,6 +37,7 @@ const Study = (() => {
     _buildCards();
     _renderAll();
     _showLoading(false);
+    if (_view === 'map') _initStudyMap();
   }
 
   // ── Public setters ────────────────────────────────────────
@@ -55,12 +63,15 @@ const Study = (() => {
     _buildCards();
     _renderAll();
     _showLoading(false);
+    if (_view === 'map') _updateStudyMapLayer();
   }
 
   function setView(view) {
     _view = view;
     _syncViewBtns();
     _renderViewPanel();
+    _renderNorwayTabsVisibility();
+    if (view === 'map') _initStudyMap();
   }
 
   function setFlashType(type) {
@@ -232,8 +243,10 @@ const Study = (() => {
   function _syncViewBtns() {
     const b = document.getElementById('view-browse');
     const f = document.getElementById('view-flash');
+    const m = document.getElementById('view-map');
     if (b) b.classList.toggle('active', _view === 'browse');
     if (f) f.classList.toggle('active', _view === 'flash');
+    if (m) m.classList.toggle('active', _view === 'map');
   }
 
   function _syncNorwayTabs() {
@@ -244,14 +257,16 @@ const Study = (() => {
 
   function _renderNorwayTabsVisibility() {
     const wrap = document.getElementById('norway-sub-tabs');
-    if (wrap) wrap.style.display = _mode === 'norway' ? '' : 'none';
+    if (wrap) wrap.style.display = (_mode === 'norway' && _view !== 'map') ? '' : 'none';
   }
 
   function _renderViewPanel() {
     const b = document.getElementById('study-browse');
     const f = document.getElementById('study-flash');
+    const m = document.getElementById('study-map-panel');
     if (b) b.style.display = _view === 'browse' ? '' : 'none';
     if (f) f.style.display = _view === 'flash'  ? '' : 'none';
+    if (m) m.style.display = _view === 'map'    ? '' : 'none';
   }
 
   function _renderFilterOptions() {
@@ -504,6 +519,105 @@ const Study = (() => {
         ${data.sub ? `<div class="flash-sub-text">${_esc(data.sub)}</div>` : ''}
       `;
     }
+  }
+
+  // ── Study map ────────────────────────────────────────
+
+  async function _initStudyMap() {
+    if (!document.getElementById('study-leaflet-map')) return;
+
+    if (!_studyMap) {
+      _studyMap = L.map('study-leaflet-map', {
+        zoomControl: true,
+        attributionControl: false,
+        minZoom: 1,
+        maxZoom: 12,
+      });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }).addTo(_studyMap);
+    }
+    await _updateStudyMapLayer();
+  }
+
+  async function _updateStudyMapLayer() {
+    if (!_studyMap) return;
+
+    if (_studyGeoLayer) { _studyMap.removeLayer(_studyGeoLayer); _studyGeoLayer = null; }
+    if (_studyUSLayer)  { _studyMap.removeLayer(_studyUSLayer);  _studyUSLayer  = null; }
+
+    const STYLE_BASE  = { fillColor: '#1a3a5c', fillOpacity: 0.35, color: '#3b6fa0', weight: 1 };
+    const STYLE_HOVER = { fillOpacity: 0.65, color: '#5aaff0', weight: 1.5 };
+
+    if (_mode === 'world') {
+      if (!_worldGeoJson) {
+        try {
+          const res = await fetch('https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson');
+          _worldGeoJson = await res.json();
+        } catch (e) { console.error('World GeoJSON load failed', e); return; }
+      }
+      _studyGeoLayer = L.geoJSON(_worldGeoJson, {
+        style: () => ({ ...STYLE_BASE }),
+        onEachFeature(feature, layer) {
+          const props   = feature.properties || {};
+          const iso2    = (props.iso_a2 || props.ISO_A2 || '').toLowerCase();
+          const name    = props.admin || props.ADMIN || props.name || '';
+          const country = (_data && _data.countries || []).find(c => c.iso2 === iso2);
+
+          layer.on('mouseover', () => layer.setStyle(STYLE_HOVER));
+          layer.on('mouseout',  () => layer.setStyle(STYLE_BASE));
+          layer.on('click', () => {
+            const flag = iso2
+              ? `<img src="https://flagcdn.com/32x24/${iso2}.png" style="border-radius:2px;vertical-align:middle;margin-bottom:4px"><br>`
+              : '';
+            const html = country
+              ? `${flag}<strong>${_esc(name)}</strong><br>
+                 🏙️ ${_esc(country.capital || '—')}<br>
+                 🌍 ${_esc(country.continent)}
+                 ${country.currency ? `<br>💰 ${_esc(country.currency)}` : ''}
+                 ${country.language ? `<br>🗣️ ${_esc(country.language)}` : ''}`
+              : `<strong>${_esc(name)}</strong>`;
+            layer.bindPopup(html, { className: 'study-dark-popup', maxWidth: 220 }).openPopup();
+          });
+        },
+      }).addTo(_studyMap);
+      _studyMap.fitBounds(_studyGeoLayer.getBounds(), { padding: [10, 10] });
+
+    } else if (_mode === 'usa') {
+      if (!_usGeoJson) {
+        try {
+          const res = await fetch('https://cdn.jsdelivr.net/gh/PublicaMundi/MappingAPI/data/geojson/us-states.json');
+          _usGeoJson = await res.json();
+        } catch (e) { console.error('US states GeoJSON load failed', e); return; }
+      }
+      _studyUSLayer = L.geoJSON(_usGeoJson, {
+        style: () => ({ ...STYLE_BASE }),
+        onEachFeature(feature, layer) {
+          const props = feature.properties || {};
+          const name  = props.name || props.NAME || '';
+          const state = (_data && _data.states || []).find(s => s.name === name);
+
+          layer.on('mouseover', () => layer.setStyle(STYLE_HOVER));
+          layer.on('mouseout',  () => layer.setStyle(STYLE_BASE));
+          layer.on('click', () => {
+            const html = state
+              ? `<strong>${_esc(name)}</strong> <span style="color:#38bdf8">(${_esc(state.abbr)})</span><br>
+                 🏛️ ${_esc(state.capital)}<br>
+                 📍 ${_esc(state.region)}`
+              : `<strong>${_esc(name)}</strong>`;
+            layer.bindPopup(html, { className: 'study-dark-popup', maxWidth: 200 }).openPopup();
+          });
+        },
+      }).addTo(_studyMap);
+      _studyMap.fitBounds([[24, -125], [50, -66]], { padding: [10, 10] });
+
+    } else if (_mode === 'norway') {
+      _studyMap.setView([64.5, 16], 5);
+    }
+
+    setTimeout(() => _studyMap && _studyMap.invalidateSize(), 150);
   }
 
   function _showLoading(show) {

@@ -236,6 +236,7 @@
       <div class="pill-group study-view-row">
         <button class="pill-btn active" id="view-browse" onclick="Study.setView('browse')">📋 Browse</button>
         <button class="pill-btn"        id="view-flash"  onclick="Study.setView('flash')">🃏 Flashcards</button>
+        <button class="pill-btn"        id="view-map"    onclick="Study.setView('map')">🗺️ Map</button>
       </div>
 
       <!-- Norway sub-category tabs -->
@@ -280,6 +281,12 @@
         <div class="flash-actions">
           <button class="btn-secondary" onclick="Study.shuffle()">🔀 Shuffle</button>
         </div>
+      </div>
+
+      <!-- MAP VIEW -->
+      <div id="study-map-panel" style="display:none">
+        <div id="study-leaflet-map"></div>
+        <p class="study-map-tip">Click a country or state for details · Scroll or pinch to zoom</p>
       </div>
     </div><!-- /study-content -->
   </div>
