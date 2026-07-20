@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>GeoQuiz – Learn World Geography</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
   <link rel="stylesheet" href="css/style.css">
@@ -137,6 +137,7 @@
           placeholder="Type your answer…"
           autocomplete="off"
           autocorrect="off"
+          autocapitalize="none"
           spellcheck="false"
         >
         <button class="btn-primary" id="text-answer-submit" onclick="App.submitTextAnswer()">Submit</button>

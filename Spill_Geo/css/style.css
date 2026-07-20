@@ -28,6 +28,11 @@
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+button, input {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 html, body {
   height: 100%;
   overflow: hidden;
@@ -66,7 +71,7 @@ body {
   max-width: 540px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: 24px 16px calc(48px + env(safe-area-inset-bottom));
 }
 
 .center-content {
@@ -75,7 +80,7 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  padding: 32px 16px;
+  padding: 32px 16px calc(32px + env(safe-area-inset-bottom));
 }
 
 /* ── START SCREEN ── */
@@ -138,6 +143,11 @@ body {
   box-shadow: 0 8px 32px rgba(56,189,248,0.15);
 }
 
+.mode-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 .mode-flag { font-size: 2rem; }
 
 .mode-name {
@@ -168,7 +178,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text-muted);
-  padding: 6px 14px;
+  padding: 10px 18px;
   cursor: pointer;
   font-size: 0.875rem;
   transition: var(--transition);
@@ -320,7 +330,8 @@ body {
 }
 
 .btn-primary:active {
-  transform: translateY(0);
+  transform: scale(0.97);
+  opacity: 0.85;
 }
 
 .btn-secondary {
@@ -338,6 +349,10 @@ body {
 .btn-secondary:hover {
   border-color: var(--accent);
   color: var(--text);
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
 }
 
 .btn-large {
@@ -464,9 +479,9 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 3px 8px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: var(--transition);
   white-space: nowrap;
@@ -543,6 +558,10 @@ body {
   border-color: var(--accent);
   background: rgba(56,189,248,0.08);
   transform: translateY(-1px);
+}
+
+.option-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .option-btn:disabled {
@@ -904,6 +923,34 @@ body {
 
   .results-stats-row {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .map-question-card {
+    padding: 12px 14px;
+  }
+
+  .map-question-card p {
+    font-size: 0.95rem;
+  }
+
+  .quiz-body {
+    padding: 14px 12px calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 360px) {
+  .quiz-meta {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+
+  .score-badge {
+    font-size: 0.78rem;
+    padding: 3px 8px;
+  }
+
+  .question-counter {
+    font-size: 0.78rem;
   }
 }
 
