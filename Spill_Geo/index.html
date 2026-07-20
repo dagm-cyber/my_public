@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuiz – Learn World Geography</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════ SCREEN: START ═══════════════════════════════════ -->
+<div id="screen-start" class="screen active">
+  <div class="screen-content center-content">
+    <div class="hero">
+      <div class="hero-icon">🌍</div>
+      <h1 class="hero-title">GeoQuiz</h1>
+      <p class="hero-subtitle">How well do you know our planet?</p>
+    </div>
+    <div class="mode-buttons">
+      <button class="mode-btn" id="btn-mode-norway" onclick="App.selectMode('norway')">
+        <span class="mode-flag">🇳🇴</span>
+        <span class="mode-name">Norway</span>
+        <span class="mode-desc">Counties, mountains, fjords &amp; cities</span>
+      </button>
+      <button class="mode-btn" id="btn-mode-world" onclick="App.selectMode('world')">
+        <span class="mode-flag">🌍</span>
+        <span class="mode-name">World</span>
+        <span class="mode-desc">Countries, capitals, flags &amp; maps</span>
+      </button>
+      <button class="mode-btn" id="btn-mode-usa" onclick="App.selectMode('usa')">
+        <span class="mode-flag">🇺🇸</span>
+        <span class="mode-name">United States</span>
+        <span class="mode-desc">States, capitals &amp; major cities</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN: SETTINGS ═══════════════════════════════════ -->
+<div id="screen-settings" class="screen">
+  <div class="screen-content">
+    <div class="screen-header">
+      <button class="back-btn" onclick="App.showScreen('screen-start')">← Back</button>
+      <h2 id="settings-title">Settings</h2>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label-row">
+        <h3 class="settings-label">Categories</h3>
+        <button class="link-btn" id="cat-toggle-all" onclick="App.toggleAllCategories()">Deselect All</button>
+      </div>
+      <div id="categories-container" class="categories-grid"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3 class="settings-label">Difficulty</h3>
+      <div class="pill-group" id="diff-group">
+        <button class="pill-btn" data-diff="easy"   onclick="App.setDifficulty('easy')">Easy</button>
+        <button class="pill-btn active" data-diff="medium" onclick="App.setDifficulty('medium')">Medium</button>
+        <button class="pill-btn" data-diff="hard"   onclick="App.setDifficulty('hard')">Hard</button>
+      </div>
+      <p class="settings-hint" id="diff-hint">Medium: common countries and landmarks.</p>
+    </div>
+
+    <div class="settings-section" id="continent-section" style="display:none">
+      <h3 class="settings-label">Continent</h3>
+      <div class="pill-group" id="continent-group">
+        <button class="pill-btn active" data-continent="all"           onclick="App.setContinent('all')">🌍 All</button>
+        <button class="pill-btn" data-continent="Europe"          onclick="App.setContinent('Europe')">Europe</button>
+        <button class="pill-btn" data-continent="Asia"            onclick="App.setContinent('Asia')">Asia</button>
+        <button class="pill-btn" data-continent="Africa"          onclick="App.setContinent('Africa')">Africa</button>
+        <button class="pill-btn" data-continent="North America"   onclick="App.setContinent('North America')">N. America</button>
+        <button class="pill-btn" data-continent="South America"   onclick="App.setContinent('South America')">S. America</button>
+        <button class="pill-btn" data-continent="Oceania"         onclick="App.setContinent('Oceania')">Oceania</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 class="settings-label">Timer per Question</h3>
+      <div class="pill-group" id="timer-group">
+        <button class="pill-btn active" data-timer="0"  onclick="App.setTimer(0)">Off</button>
+        <button class="pill-btn"        data-timer="15" onclick="App.setTimer(15)">15 s</button>
+        <button class="pill-btn"        data-timer="30" onclick="App.setTimer(30)">30 s</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 class="settings-label">Number of Questions</h3>
+      <div class="pill-group" id="count-group">
+        <button class="pill-btn" data-count="10" onclick="App.setCount(10)">10</button>
+        <button class="pill-btn active" data-count="20" onclick="App.setCount(20)">20</button>
+        <button class="pill-btn" data-count="30" onclick="App.setCount(30)">30</button>
+      </div>
+    </div>
+
+    <button class="btn-primary btn-large btn-start" id="btn-start" onclick="App.startGame()">
+      Start Quiz →
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN: QUIZ ═══════════════════════════════════ -->
+<div id="screen-quiz" class="screen">
+  <div class="quiz-header">
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div class="quiz-meta">
+      <button class="quit-btn" onclick="App.quitGame()" title="Quit game">✕ Quit</button>
+      <span class="question-counter" id="question-counter">1 / 10</span>
+      <span class="countdown-text" id="countdown-text"></span>
+      <span class="score-badge" id="score-badge">0 pts</span>
+    </div>
+    <div class="countdown-bar-wrap" id="countdown-bar-wrap">
+      <div class="countdown-bar" id="countdown-bar"></div>
+    </div>
+  </div>
+
+  <div class="quiz-body">
+    <div class="question-card" id="question-card">
+      <span class="question-category-tag" id="question-category-tag"></span>
+
+      <div class="question-image-wrap" id="question-image-wrap">
+        <img id="question-image" src="" alt="Question image" loading="lazy">
+      </div>
+
+      <p class="question-text" id="question-text"></p>
+
+      <div class="options-grid" id="options-grid"></div>
+
+      <div class="text-answer-wrap" id="text-answer-wrap">
+        <input
+          type="text"
+          id="text-answer-input"
+          class="text-answer-input"
+          placeholder="Type your answer…"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+        >
+        <button class="btn-primary" id="text-answer-submit" onclick="App.submitTextAnswer()">Submit</button>
+      </div>
+
+      <div class="feedback-box" id="feedback-box">
+        <span class="feedback-icon" id="feedback-icon"></span>
+        <div class="feedback-body">
+          <span class="feedback-text" id="feedback-text"></span>
+          <span class="feedback-hint" id="feedback-hint"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN: MAP ═══════════════════════════════════ -->
+<div id="screen-map" class="screen">
+  <div class="map-ui-layer">
+    <div class="map-question-card" id="map-question-card">
+      <span class="question-category-tag">📍 Locate on Map</span>
+      <p id="map-question-text"></p>
+      <!-- Capital follow-up: shown after state is found correctly -->
+      <div id="map-capital-section" style="display:none">
+        <p class="map-capital-label" id="map-capital-prompt"></p>
+        <div class="options-grid" id="map-capital-options"></div>
+      </div>
+    </div>
+    <div class="map-feedback-toast" id="map-feedback-toast">
+      <span class="feedback-icon" id="map-feedback-icon"></span>
+      <span id="map-feedback-text"></span>
+      <button class="btn-primary btn-sm" id="map-next-btn" onclick="App.advanceFromMap()">Next →</button>
+    </div>
+    <div class="map-score-pill" id="map-score-pill">0 pts</div>
+    <button class="quit-btn quit-btn-map" onclick="App.quitGame()" title="Quit game">✕ Quit</button>
+  </div>
+  <div id="leaflet-map"></div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN: RESULTS ═══════════════════════════════════ -->
+<div id="screen-results" class="screen">
+  <div class="screen-content">
+    <div class="results-hero">
+      <div class="grade-circle" id="grade-circle"></div>
+      <p class="results-score-label" id="results-score-label"></p>
+      <p class="results-accuracy" id="results-accuracy"></p>
+    </div>
+
+    <div class="results-stats-row" id="results-stats-row"></div>
+
+    <div class="missed-section" id="missed-section">
+      <h3 class="missed-title">
+        <button class="missed-toggle" id="missed-toggle" onclick="App.toggleMissed()">
+          ▶ Missed Questions
+        </button>
+      </h3>
+      <div class="missed-list" id="missed-list"></div>
+    </div>
+
+    <div class="results-actions">
+      <button class="btn-secondary" onclick="App.showScreen('screen-start')">Change Mode</button>
+      <button class="btn-primary" onclick="App.playAgain()">Play Again</button>
+    </div>
+
+    <div class="highscore-section" id="highscore-section">
+      <h3>Best Scores</h3>
+      <div id="highscore-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/questions.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/map-module.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

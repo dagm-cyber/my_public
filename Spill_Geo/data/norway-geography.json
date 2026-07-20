@@ -1,0 +1,55 @@
+{
+  "mountains": [
+    {"name":"Galdhøpiggen","height":2469,"county":"Oppland","range":"Jotunheimen","difficulty":"easy"},
+    {"name":"Glittertind","height":2465,"county":"Oppland","range":"Jotunheimen","difficulty":"medium"},
+    {"name":"Skagastølstinden","height":2405,"county":"Sogn og Fjordane","range":"Jotunheimen","difficulty":"hard"},
+    {"name":"Storen","height":2387,"county":"Oppland","range":"Jotunheimen","difficulty":"hard"},
+    {"name":"Snøhetta","height":2286,"county":"Oppland","range":"Dovrefjell","difficulty":"easy"},
+    {"name":"Falketind","height":2067,"county":"Sogn og Fjordane","range":"Jotunheimen","difficulty":"hard"},
+    {"name":"Gaustatoppen","height":1883,"county":"Telemark","range":"Gaustamassiv","difficulty":"medium"},
+    {"name":"Stetind","height":1392,"county":"Nordland","range":"Ofoten","difficulty":"medium"},
+    {"name":"Romsdalshorn","height":1550,"county":"Møre og Romsdal","range":"Romsdalen","difficulty":"hard"},
+    {"name":"Trolltindene","height":1788,"county":"Møre og Romsdal","range":"Romsdalen","difficulty":"hard"}
+  ],
+  "lakes": [
+    {"name":"Mjøsa","county":"Oppland/Hedmark","area":368,"depth":443,"difficulty":"easy"},
+    {"name":"Røssvatnet","county":"Nordland","area":218,"depth":240,"difficulty":"medium"},
+    {"name":"Femunden","county":"Hedmark","area":204,"depth":161,"difficulty":"medium"},
+    {"name":"Randsfjorden","county":"Oppland","area":136,"depth":120,"difficulty":"medium"},
+    {"name":"Tyrifjorden","county":"Buskerud","area":134,"depth":295,"difficulty":"medium"},
+    {"name":"Snåsavatnet","county":"Nord-Trøndelag","area":122,"depth":72,"difficulty":"hard"},
+    {"name":"Tunhovdfjorden","county":"Buskerud","area":65,"depth":70,"difficulty":"hard"},
+    {"name":"Sperillen","county":"Buskerud","area":48,"depth":44,"difficulty":"hard"},
+    {"name":"Bandak","county":"Telemark","area":47,"depth":150,"difficulty":"hard"},
+    {"name":"Akersvatnet","county":"Rogaland","area":13,"depth":20,"difficulty":"hard"}
+  ],
+  "fjords": [
+    {"name":"Sognefjorden","county":"Sogn og Fjordane","length":205,"maxDepth":1308,"difficulty":"easy"},
+    {"name":"Hardangerfjorden","county":"Hordaland","length":179,"maxDepth":891,"difficulty":"easy"},
+    {"name":"Geirangerfjorden","county":"Møre og Romsdal","length":15,"maxDepth":260,"difficulty":"easy"},
+    {"name":"Nordfjord","county":"Sogn og Fjordane","length":106,"maxDepth":553,"difficulty":"medium"},
+    {"name":"Lysefjorden","county":"Rogaland","length":42,"maxDepth":422,"difficulty":"medium"},
+    {"name":"Nærøyfjorden","county":"Sogn og Fjordane","length":17,"maxDepth":500,"difficulty":"medium"},
+    {"name":"Porsangerfjorden","county":"Finnmark","length":123,"maxDepth":193,"difficulty":"hard"},
+    {"name":"Altafjorden","county":"Finnmark","length":30,"maxDepth":200,"difficulty":"hard"},
+    {"name":"Hjørundfjorden","county":"Møre og Romsdal","length":35,"maxDepth":540,"difficulty":"hard"},
+    {"name":"Trondheimsfjorden","county":"Sør-Trøndelag","length":130,"maxDepth":617,"difficulty":"medium"}
+  ],
+  "cities": [
+    {"name":"Oslo","county":"Oslo","population":717710,"difficulty":"easy"},
+    {"name":"Bergen","county":"Hordaland","population":285911,"difficulty":"easy"},
+    {"name":"Trondheim","county":"Sør-Trøndelag","population":214565,"difficulty":"easy"},
+    {"name":"Stavanger","county":"Rogaland","population":145104,"difficulty":"easy"},
+    {"name":"Tromsø","county":"Troms","population":79081,"difficulty":"medium"},
+    {"name":"Drammen","county":"Buskerud","population":101386,"difficulty":"medium"},
+    {"name":"Kristiansand","county":"Vest-Agder","population":116555,"difficulty":"medium"},
+    {"name":"Bodø","county":"Nordland","population":53200,"difficulty":"medium"},
+    {"name":"Fredrikstad","county":"Østfold","population":83193,"difficulty":"medium"},
+    {"name":"Ålesund","county":"Møre og Romsdal","population":50000,"difficulty":"medium"},
+    {"name":"Tønsberg","county":"Vestfold","population":55000,"difficulty":"hard"},
+    {"name":"Skien","county":"Telemark","population":54872,"difficulty":"hard"},
+    {"name":"Arendal","county":"Aust-Agder","population":45000,"difficulty":"hard"},
+    {"name":"Haugesund","county":"Rogaland","population":35000,"difficulty":"hard"},
+    {"name":"Steinkjer","county":"Nord-Trøndelag","population":22000,"difficulty":"hard"}
+  ]
+}

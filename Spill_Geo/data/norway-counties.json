@@ -1,0 +1,21 @@
+[
+  {"name":"Oslo","center":"Oslo","region":"Eastern Norway"},
+  {"name":"Akershus","center":"Oslo","region":"Eastern Norway"},
+  {"name":"Østfold","center":"Sarpsborg","region":"Eastern Norway"},
+  {"name":"Hedmark","center":"Hamar","region":"Eastern Norway"},
+  {"name":"Oppland","center":"Lillehammer","region":"Eastern Norway"},
+  {"name":"Buskerud","center":"Drammen","region":"Eastern Norway"},
+  {"name":"Vestfold","center":"Tønsberg","region":"Eastern Norway"},
+  {"name":"Telemark","center":"Skien","region":"Southern Norway"},
+  {"name":"Aust-Agder","center":"Arendal","region":"Southern Norway"},
+  {"name":"Vest-Agder","center":"Kristiansand","region":"Southern Norway"},
+  {"name":"Rogaland","center":"Stavanger","region":"Western Norway"},
+  {"name":"Hordaland","center":"Bergen","region":"Western Norway"},
+  {"name":"Sogn og Fjordane","center":"Sogndal","region":"Western Norway"},
+  {"name":"Møre og Romsdal","center":"Molde","region":"Western Norway"},
+  {"name":"Sør-Trøndelag","center":"Trondheim","region":"Trøndelag"},
+  {"name":"Nord-Trøndelag","center":"Steinkjer","region":"Trøndelag"},
+  {"name":"Nordland","center":"Bodø","region":"Northern Norway"},
+  {"name":"Troms","center":"Tromsø","region":"Northern Norway"},
+  {"name":"Finnmark","center":"Vadsø","region":"Northern Norway"}
+]
