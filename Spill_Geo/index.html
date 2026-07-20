@@ -33,6 +33,11 @@
         <span class="mode-name">United States</span>
         <span class="mode-desc">States, capitals &amp; major cities</span>
       </button>
+      <button class="mode-btn" id="btn-mode-study" onclick="Study.open()">
+        <span class="mode-flag">📚</span>
+        <span class="mode-name">Study</span>
+        <span class="mode-desc">Browse &amp; flashcards for all topics</span>
+      </button>
     </div>
   </div>
 </div>
@@ -209,11 +214,83 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════ SCREEN: STUDY ══════════════════════════════ -->
+<div id="screen-study" class="screen">
+  <div class="screen-content">
+    <div class="screen-header">
+      <button class="back-btn" onclick="App.showScreen('screen-start')">← Back</button>
+      <h2>Study</h2>
+    </div>
+
+    <div id="study-loading" style="display:none; text-align:center; padding:40px; color:var(--text-muted)">Loading…</div>
+
+    <div id="study-content">
+      <!-- Mode tabs -->
+      <div class="study-mode-tabs">
+        <button class="study-tab active" data-mode="world"  onclick="Study.setMode('world')">🌍 World</button>
+        <button class="study-tab"        data-mode="usa"    onclick="Study.setMode('usa')">🇺🇸 USA</button>
+        <button class="study-tab"        data-mode="norway" onclick="Study.setMode('norway')">🇳🇴 Norway</button>
+      </div>
+
+      <!-- View toggle -->
+      <div class="pill-group study-view-row">
+        <button class="pill-btn active" id="view-browse" onclick="Study.setView('browse')">📋 Browse</button>
+        <button class="pill-btn"        id="view-flash"  onclick="Study.setView('flash')">🃏 Flashcards</button>
+      </div>
+
+      <!-- Norway sub-category tabs -->
+      <div id="norway-sub-tabs" class="norway-sub-tabs" style="display:none">
+        <button class="norway-sub-tab active" data-cat="counties"  onclick="Study.setNorwayCategory('counties')">🏛️ Counties</button>
+        <button class="norway-sub-tab"        data-cat="mountains" onclick="Study.setNorwayCategory('mountains')">⛰️ Mountains</button>
+        <button class="norway-sub-tab"        data-cat="lakes"     onclick="Study.setNorwayCategory('lakes')">💧 Lakes</button>
+        <button class="norway-sub-tab"        data-cat="fjords"    onclick="Study.setNorwayCategory('fjords')">🌊 Fjords</button>
+        <button class="norway-sub-tab"        data-cat="cities"    onclick="Study.setNorwayCategory('cities')">🏙️ Cities</button>
+      </div>
+
+      <!-- BROWSE VIEW -->
+      <div id="study-browse">
+        <div class="study-search-row">
+          <input type="text" id="study-search" class="study-search-input"
+                 placeholder="Search…"
+                 autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                 oninput="Study.onSearch(this.value)">
+          <select id="study-filter" class="study-filter-select" onchange="Study.onFilter(this.value)"></select>
+        </div>
+        <div id="study-grid" class="study-grid"></div>
+      </div>
+
+      <!-- FLASH VIEW -->
+      <div id="study-flash" style="display:none">
+        <div class="flash-type-row" id="flash-type-row">
+          <select id="flash-type" class="study-filter-select study-filter-full" onchange="Study.setFlashType(this.value)"></select>
+        </div>
+
+        <div class="flashcard" id="flashcard" onclick="Study.flip()">
+          <div class="flash-side" id="flash-front"></div>
+          <div class="flash-side" id="flash-back" style="display:none"></div>
+          <div class="flash-hint" id="flash-hint">Tap card to reveal answer</div>
+        </div>
+
+        <div class="flash-nav">
+          <button class="flash-nav-btn" onclick="Study.prev()">← Prev</button>
+          <span class="flash-counter" id="flash-counter">1 / 1</span>
+          <button class="flash-nav-btn" onclick="Study.next()">Next →</button>
+        </div>
+
+        <div class="flash-actions">
+          <button class="btn-secondary" onclick="Study.shuffle()">🔀 Shuffle</button>
+        </div>
+      </div>
+    </div><!-- /study-content -->
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/questions.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/map-module.js"></script>
 <script src="js/app.js"></script>
+<script src="js/study.js"></script>
 </body>
 </html>
