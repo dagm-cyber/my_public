@@ -247,6 +247,21 @@
                 <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37-1.34-1.34a1 1 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 0 0 0-1.41z"/>
             </svg>
         </button>
+        <button class="tool-btn" id="btn-polygon"
+                title="Polygon fill — P  (click/tap to add points · snap to start or Enter to fill · Esc to cancel)">
+            <!-- Pentagon outline -->
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="12,3 21,9 17.5,20 6.5,20 3,9"/>
+            </svg>
+        </button>
+        <button class="tool-btn" id="btn-ellipse" title="Ellipse fill — E  (drag to draw)">
+            <!-- Ellipse outline -->
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <ellipse cx="12" cy="12" rx="10" ry="6"/>
+            </svg>
+        </button>
     </div>
 
     <div class="sep"></div>
@@ -323,6 +338,8 @@
     <!-- Canvas — pixel dimensions set dynamically when image loads -->
     <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="canvas" width="1" height="1"></canvas>
+        <!-- Transparent overlay for shape previews; pointer-events:none so all clicks reach the main canvas -->
+        <canvas id="overlay" width="1" height="1" style="position:absolute;top:0;left:0;pointer-events:none"></canvas>
     </div>
 </main>
 
@@ -346,6 +363,8 @@
 /* ── Element references ───────────────────────────────────────── */
 const canvas      = document.getElementById('canvas');
 const ctx         = canvas.getContext('2d', { willReadFrequently: true });
+const overlay     = document.getElementById('overlay');
+const overlayCtx  = overlay.getContext('2d');
 const canvasArea  = document.getElementById('canvas-area');
 const canvasWrap  = document.getElementById('canvas-wrap');
 const dropOverlay = document.getElementById('drop-overlay');
@@ -360,6 +379,8 @@ const sizeOut     = document.getElementById('size-out');
 
 const btnBucket   = document.getElementById('btn-bucket');
 const btnBrush    = document.getElementById('btn-brush');
+const btnPolygon  = document.getElementById('btn-polygon');
+const btnEllipse  = document.getElementById('btn-ellipse');
 const btnUpload   = document.getElementById('btn-upload');
 const btnUndo     = document.getElementById('btn-undo');
 const btnRedo     = document.getElementById('btn-redo');
@@ -375,14 +396,19 @@ const stPos  = document.getElementById('st-pos');
 const stUndo = document.getElementById('st-undo');
 
 /* ── Application state ────────────────────────────────────────── */
-let imageLoaded = false;
-let currentTool = 'bucket';   // 'bucket' | 'brush'
-let isDrawing   = false;
-let lastPos     = null;        // last brush stroke position (canvas px)
+let imageLoaded  = false;
+let currentTool  = 'bucket';  // 'bucket' | 'brush' | 'polygon' | 'ellipse'
+let isDrawing    = false;
+let lastPos      = null;      // last brush stroke position (canvas px)
+let lastKnownPos = null;      // last canvas position seen in onMove
 
 const MAX_UNDO  = 25;
 const undoStack = [];          // Array<ImageData>
 const redoStack = [];          // Array<ImageData>
+
+/* ── Shape tool state ─────────────────────────────────────────── */
+let polygonPts   = [];    // Array<{x,y}> placed polygon vertices (canvas coords)
+let ellipseStart = null;  // {x,y} drag-start of current ellipse (canvas coords)
 
 /* ── View state (zoom / pan) ──────────────────────────────────── */
 let viewX = 0, viewY = 0, viewScale = 1;
@@ -398,6 +424,8 @@ function loadImage(file) {
         img.onload = () => {
             canvas.width  = img.naturalWidth;
             canvas.height = img.naturalHeight;
+            overlay.width  = img.naturalWidth;
+            overlay.height = img.naturalHeight;
             ctx.drawImage(img, 0, 0);
             imageLoaded      = true;
             undoStack.length = 0;
@@ -540,6 +568,127 @@ function drawBrush(x, y) {
     lastPos = { x, y };
 }
 
+/* ── Overlay canvas (shape preview) ──────────────────────────── */
+function clearOverlay() {
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+}
+
+/* ── Polygon tool ─────────────────────────────────────────────── */
+// Redraws the in-progress polygon on the overlay canvas.
+// cx, cy = current cursor position in canvas pixels (null = no cursor)
+function drawPolygonPreview(cx, cy) {
+    clearOverlay();
+    if (polygonPts.length === 0) return;
+
+    // Keep handles a constant screen size regardless of zoom level
+    const hr      = Math.max(1.5, 6 / viewScale);
+    const lw      = Math.max(0.5, 1.5 / viewScale);
+    const dashLen = Math.max(2, 5 / viewScale);
+
+    // Snap to first point when within 15 display pixels
+    const rect  = canvas.getBoundingClientRect();
+    const snapT = 15 * (canvas.width / rect.width);
+    const nearFirst = cx !== null && polygonPts.length >= 3 &&
+        Math.hypot(cx - polygonPts[0].x, cy - polygonPts[0].y) < snapT;
+    const tx = nearFirst ? polygonPts[0].x : cx;
+    const ty = nearFirst ? polygonPts[0].y : cy;
+
+    overlayCtx.save();
+    overlayCtx.lineWidth   = lw;
+    overlayCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+    overlayCtx.setLineDash([dashLen, dashLen]);
+    overlayCtx.shadowColor = 'rgba(0,0,0,0.55)';
+    overlayCtx.shadowBlur  = 3 / viewScale;
+    overlayCtx.beginPath();
+    polygonPts.forEach((p, i) =>
+        i === 0 ? overlayCtx.moveTo(p.x, p.y) : overlayCtx.lineTo(p.x, p.y));
+    if (tx !== null) overlayCtx.lineTo(tx, ty);
+    overlayCtx.stroke();
+    overlayCtx.restore();
+
+    // Draw point handles
+    polygonPts.forEach((p, i) => {
+        const snap = i === 0 && nearFirst;
+        overlayCtx.beginPath();
+        overlayCtx.arc(p.x, p.y, hr * (snap ? 1.8 : 1), 0, Math.PI * 2);
+        overlayCtx.fillStyle   = snap ? colorPicker.value : '#fff';
+        overlayCtx.fill();
+        overlayCtx.lineWidth   = lw;
+        overlayCtx.strokeStyle = i === 0 ? colorPicker.value : 'rgba(0,0,0,0.45)';
+        overlayCtx.stroke();
+    });
+}
+
+function handlePolygonDown(x, y) {
+    if (polygonPts.length >= 3) {
+        const rect  = canvas.getBoundingClientRect();
+        const snapT = 15 * (canvas.width / rect.width);
+        if (Math.hypot(x - polygonPts[0].x, y - polygonPts[0].y) < snapT) {
+            commitPolygon(); return;
+        }
+    }
+    polygonPts.push({ x, y });
+    drawPolygonPreview(x, y);
+}
+
+function commitPolygon() {
+    if (polygonPts.length < 3) { cancelPolygon(); return; }
+    saveState();
+    ctx.fillStyle = colorPicker.value;
+    ctx.beginPath();
+    polygonPts.forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+    ctx.fill();
+    cancelPolygon();
+}
+
+function cancelPolygon() {
+    polygonPts = [];
+    clearOverlay();
+}
+
+/* ── Ellipse tool ─────────────────────────────────────────────── */
+function drawEllipsePreview(ex, ey) {
+    clearOverlay();
+    if (!ellipseStart) return;
+    const rx = Math.abs(ex - ellipseStart.x) / 2;
+    const ry = Math.abs(ey - ellipseStart.y) / 2;
+    if (rx < 1 || ry < 1) return;
+    const lw      = Math.max(0.5, 1.5 / viewScale);
+    const dashLen = Math.max(2, 5 / viewScale);
+    overlayCtx.save();
+    overlayCtx.lineWidth   = lw;
+    overlayCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+    overlayCtx.setLineDash([dashLen, dashLen]);
+    overlayCtx.shadowColor = 'rgba(0,0,0,0.55)';
+    overlayCtx.shadowBlur  = 3 / viewScale;
+    overlayCtx.beginPath();
+    overlayCtx.ellipse(
+        (ex + ellipseStart.x) / 2, (ey + ellipseStart.y) / 2,
+        rx, ry, 0, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    overlayCtx.restore();
+}
+
+function commitEllipse(ex, ey) {
+    if (!ellipseStart) return;
+    const rx = Math.abs(ex - ellipseStart.x) / 2;
+    const ry = Math.abs(ey - ellipseStart.y) / 2;
+    if (rx >= 2 && ry >= 2) {
+        saveState();
+        ctx.fillStyle = colorPicker.value;
+        ctx.beginPath();
+        ctx.ellipse(
+            (ex + ellipseStart.x) / 2, (ey + ellipseStart.y) / 2,
+            rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ellipseStart = null;
+    isDrawing    = false;
+    clearOverlay();
+}
+
 /* ── View: zoom & pan ────────────────────────────────────────── */
 function applyView() {
     canvasWrap.style.transform = `translate(${viewX}px, ${viewY}px) scale(${viewScale})`;
@@ -563,23 +712,28 @@ function onDown(e) {
     if (!imageLoaded) return;
     e.preventDefault();
     const { x, y } = getPos(e);
+    lastKnownPos = { x, y };
 
     if (currentTool === 'bucket') {
         floodFill(x, y);
-    } else {
-        // Brush: save before the stroke, then start drawing
+    } else if (currentTool === 'brush') {
         saveState();
         isDrawing = true;
         lastPos   = null;
         drawBrush(x, y);
+    } else if (currentTool === 'polygon') {
+        handlePolygonDown(x, y);
+    } else if (currentTool === 'ellipse') {
+        ellipseStart = { x, y };
+        isDrawing    = true;
     }
 }
 
 function onMove(e) {
     if (!imageLoaded) return;
     const pos = getPos(e);
+    lastKnownPos = { x: pos.x, y: pos.y };
 
-    // Update position display
     stPos.textContent = `${pos.x} × ${pos.y}`;
 
     // Desktop brush cursor ring
@@ -592,20 +746,33 @@ function onMove(e) {
         brushCursor.style.display = 'block';
     }
 
-    // Draw if brush is active
     if (isDrawing && currentTool === 'brush') {
         e.preventDefault();
         drawBrush(pos.x, pos.y);
+    } else if (isDrawing && currentTool === 'ellipse' && ellipseStart) {
+        e.preventDefault();
+        drawEllipsePreview(pos.x, pos.y);
+    } else if (currentTool === 'polygon' && polygonPts.length > 0 && !e.touches) {
+        // Ghost line from last placed point to cursor (desktop only)
+        drawPolygonPreview(pos.x, pos.y);
     }
 }
 
 function onUp() {
-    isDrawing = false;
-    lastPos   = null;
+    if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
+        commitEllipse(lastKnownPos.x, lastKnownPos.y);
+    } else {
+        isDrawing = false;
+        lastPos   = null;
+    }
 }
 
 function onLeave() {
-    onUp();
+    if (currentTool === 'polygon' && polygonPts.length > 0) {
+        drawPolygonPreview(null, null);  // hide ghost line, keep placed points
+    } else {
+        onUp();
+    }
     brushCursor.style.display = 'none';
     stPos.textContent = '';
 }
@@ -616,30 +783,43 @@ canvas.addEventListener('mousemove',  onMove);
 canvas.addEventListener('mouseup',    onUp);
 canvas.addEventListener('mouseleave', onLeave);
 
-// Touch — 1 finger = draw/fill; 2 fingers = pinch-zoom + pan
+// Touch — 1 finger = draw / fill / polygon; 2 fingers = pinch-zoom + pan
 canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     if (e.touches.length === 1) {
-        // Single finger: draw or fill
         const { x, y } = getPos(e);
+        lastKnownPos = { x, y };
+
+        // Double-tap: close polygon (if in progress with ≥3 pts) or reset view
+        const wasDoubleTap = !!tapTimer;
+        if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+        tapTimer = setTimeout(() => { tapTimer = null; }, 300);
+
+        if (wasDoubleTap) {
+            if (currentTool === 'polygon' && polygonPts.length >= 3) {
+                commitPolygon(); return;
+            } else if (currentTool !== 'polygon') {
+                initView(); return;
+            }
+            // polygon with < 3 points: fall through, add the point normally
+        }
+
         if (currentTool === 'bucket') {
             floodFill(x, y);
-        } else {
+        } else if (currentTool === 'brush') {
             saveState();
             isDrawing = true;
             lastPos   = null;
             drawBrush(x, y);
-        }
-        // Double-tap resets the view
-        if (tapTimer) {
-            clearTimeout(tapTimer);
-            tapTimer = null;
-            initView();
-        } else {
-            tapTimer = setTimeout(() => { tapTimer = null; }, 300);
+        } else if (currentTool === 'polygon') {
+            handlePolygonDown(x, y);
+        } else if (currentTool === 'ellipse') {
+            ellipseStart = { x, y };
+            isDrawing    = true;
         }
     } else if (e.touches.length >= 2) {
-        // Two fingers: cancel active stroke and begin pinch/pan
+        // Two fingers: cancel any active stroke/shape, start pinch/pan
+        if (currentTool === 'ellipse' && isDrawing) { ellipseStart = null; clearOverlay(); }
         isDrawing = false;
         lastPos   = null;
         prevPinch = { p1: e.touches[0], p2: e.touches[1] };
@@ -648,9 +828,14 @@ canvas.addEventListener('touchstart', e => {
 
 canvas.addEventListener('touchmove', e => {
     e.preventDefault();
-    if (e.touches.length === 1 && isDrawing && currentTool === 'brush') {
+    if (e.touches.length === 1) {
         const { x, y } = getPos(e);
-        drawBrush(x, y);
+        lastKnownPos = { x, y };
+        if (isDrawing && currentTool === 'brush') {
+            drawBrush(x, y);
+        } else if (isDrawing && currentTool === 'ellipse' && ellipseStart) {
+            drawEllipsePreview(x, y);
+        }
     } else if (e.touches.length >= 2 && prevPinch) {
         isDrawing = false;
         lastPos   = null;
@@ -661,18 +846,13 @@ canvas.addEventListener('touchmove', e => {
             prevPinch.p2.clientY - prevPinch.p1.clientY
         );
         const ds = curDist / prevDist;
-        // Midpoints in client coordinates
         const prevMidX = (prevPinch.p1.clientX + prevPinch.p2.clientX) / 2;
         const prevMidY = (prevPinch.p1.clientY + prevPinch.p2.clientY) / 2;
         const curMidX  = (t1.clientX + t2.clientX) / 2;
         const curMidY  = (t1.clientY + t2.clientY) / 2;
-        // Convert to canvas-area-local coordinates
         const areaRect = canvasArea.getBoundingClientRect();
-        const pmx = prevMidX - areaRect.left;
-        const pmy = prevMidY - areaRect.top;
-        const cmx = curMidX  - areaRect.left;
-        const cmy = curMidY  - areaRect.top;
-        // Zoom around prevMid, then pan to curMid (combined in one step)
+        const pmx = prevMidX - areaRect.left, pmy = prevMidY - areaRect.top;
+        const cmx = curMidX  - areaRect.left, cmy = curMidY  - areaRect.top;
         viewX = cmx - (pmx - viewX) * ds;
         viewY = cmy - (pmy - viewY) * ds;
         viewScale = Math.min(Math.max(viewScale * ds, 0.05), 20);
@@ -682,11 +862,19 @@ canvas.addEventListener('touchmove', e => {
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
+    if (e.touches.length === 0) {
+        if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
+            commitEllipse(lastKnownPos.x, lastKnownPos.y);
+        } else {
+            isDrawing = false;
+            lastPos   = null;
+        }
+    }
     if (e.touches.length < 2) prevPinch = null;
-    if (e.touches.length === 0) { isDrawing = false; lastPos = null; }
 });
 canvas.addEventListener('touchcancel', () => {
     isDrawing = false; lastPos = null; prevPinch = null;
+    ellipseStart = null; clearOverlay();
 });
 
 /* ── Mouse-wheel zoom ─────────────────────────────────────────── */
@@ -731,15 +919,30 @@ function download() {
 }
 
 /* ── Tool switching ───────────────────────────────────────────── */
+const TOOL_HINTS = {
+    bucket:  'Tool: Bucket fill',
+    brush:   'Tool: Brush',
+    polygon: 'Tool: Polygon — click/tap to place points · snap to start or Enter to fill · Esc to cancel',
+    ellipse: 'Tool: Ellipse — drag to draw'
+};
+
 function setTool(tool) {
+    // Clean up previous tool's in-progress state
+    if (currentTool === 'polygon') cancelPolygon();
+    if (currentTool === 'ellipse') { ellipseStart = null; isDrawing = false; clearOverlay(); }
+
     currentTool = tool;
-    btnBucket.classList.toggle('active', tool === 'bucket');
-    btnBrush.classList.toggle('active',  tool === 'brush');
+    btnBucket.classList.toggle('active',  tool === 'bucket');
+    btnBrush.classList.toggle('active',   tool === 'brush');
+    btnPolygon.classList.toggle('active', tool === 'polygon');
+    btnEllipse.classList.toggle('active', tool === 'ellipse');
+
     ctrlTolerance.style.display = tool === 'bucket' ? '' : 'none';
     ctrlBrush.style.display     = tool === 'brush'  ? '' : 'none';
+
     canvas.classList.toggle('brush-mode', tool === 'brush');
     brushCursor.style.display = 'none';
-    stTool.textContent = 'Tool: ' + (tool === 'bucket' ? 'Bucket fill' : 'Brush');
+    stTool.textContent = TOOL_HINTS[tool] || tool;
 }
 
 /* ── UI refresh ───────────────────────────────────────────────── */
@@ -757,8 +960,10 @@ function refresh() {
 }
 
 /* ── Button & input wiring ────────────────────────────────────── */
-btnBucket.addEventListener('click', () => setTool('bucket'));
-btnBrush.addEventListener('click',  () => setTool('brush'));
+btnBucket.addEventListener('click',  () => setTool('bucket'));
+btnBrush.addEventListener('click',   () => setTool('brush'));
+btnPolygon.addEventListener('click', () => setTool('polygon'));
+btnEllipse.addEventListener('click', () => setTool('ellipse'));
 
 [btnUpload, btnPick].forEach(b => b.addEventListener('click', () => fileInput.click()));
 fileInput.addEventListener('change', () => {
@@ -781,9 +986,13 @@ document.addEventListener('keydown', e => {
     if (ctrl && e.shiftKey && e.key === 'Z')   { e.preventDefault(); redo(); }
     if (ctrl && e.key === 'o')                 { e.preventDefault(); fileInput.click(); }
     if (ctrl && e.key === 's')                 { e.preventDefault(); download(); }
-    if (!ctrl && !e.altKey && e.key === 'b')   { setTool('bucket'); }
-    if (!ctrl && !e.altKey && e.key === 'r')   { setTool('brush'); }
-    if (!ctrl && !e.altKey && e.key === 'f')   { initView(); }   // F = fit to screen
+    if (!ctrl && !e.altKey && e.key === 'b')       { setTool('bucket'); }
+    if (!ctrl && !e.altKey && e.key === 'r')       { setTool('brush'); }
+    if (!ctrl && !e.altKey && e.key === 'p')       { setTool('polygon'); }
+    if (!ctrl && !e.altKey && e.key === 'e')       { setTool('ellipse'); }
+    if (!ctrl && !e.altKey && e.key === 'f')       { initView(); }
+    if (e.key === 'Escape')                        { if (currentTool === 'polygon') cancelPolygon(); }
+    if (e.key === 'Enter' && !e.isComposing)       { if (currentTool === 'polygon' && polygonPts.length >= 3) commitPolygon(); }
 });
 
 /* ── Init ─────────────────────────────────────────────────────── */
