@@ -147,34 +147,27 @@
         /* ── Canvas area ─────────────────────────────────────────── */
         .canvas-area {
             flex: 1;
-            overflow: auto;
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            padding: 20px;
+            overflow: hidden;
+            position: relative;
             background: var(--bg);
         }
+        .canvas-area.drag-over {
+            outline: 3px dashed var(--accent);
+            outline-offset: -3px;
+        }
 
+        /* canvas-wrap is transformed by JS (translate + scale) */
         .canvas-wrap {
-            position: relative;
-            display: inline-flex;
-            min-width: 400px;
-            min-height: 280px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
             box-shadow: 0 4px 30px rgba(0,0,0,0.6);
             border-radius: 4px;
-            overflow: hidden;
-            transition: box-shadow 0.15s;
-        }
-        .canvas-wrap.drag-over {
-            box-shadow: 0 0 0 3px var(--accent), 0 4px 30px rgba(0,0,0,0.6);
         }
 
         canvas {
             display: block;
-            max-width: min(90vw, 3840px);
-            max-height: calc(100dvh - 130px);
-            width: auto;
-            height: auto;
             cursor: crosshair;
             touch-action: none;
         }
@@ -229,8 +222,6 @@
             .app-name { display: none; }
             .toolbar  { padding: 6px 8px; gap: 4px 6px; }
             .btn span { display: none; }
-            .canvas-area { padding: 10px; }
-            .canvas-wrap { min-width: 0; min-height: 0; }
         }
     </style>
 </head>
@@ -319,19 +310,19 @@
 </header>
 
 <!-- ── Canvas area ───────────────────────────────────────────────── -->
-<main class="canvas-area">
-    <div class="canvas-wrap" id="canvas-wrap">
-        <!-- Canvas pixel dimensions are set dynamically when an image loads -->
-        <canvas id="canvas" width="1" height="1"></canvas>
+<main class="canvas-area" id="canvas-area">
+    <!-- Drop overlay — covers area before an image is loaded -->
+    <div class="drop-overlay" id="drop-overlay">
+        <div class="drop-icon">🖼️</div>
+        <p>Drop an image here</p>
+        <p class="hint">or</p>
+        <button class="btn accent" id="btn-pick">Choose file…</button>
+        <p class="hint">JPG · PNG · WebP · GIF · BMP</p>
+    </div>
 
-        <!-- Shown until an image is uploaded -->
-        <div class="drop-overlay" id="drop-overlay">
-            <div class="drop-icon">🖼️</div>
-            <p>Drop an image here</p>
-            <p class="hint">or</p>
-            <button class="btn accent" id="btn-pick">Choose file…</button>
-            <p class="hint">JPG · PNG · WebP · GIF · BMP</p>
-        </div>
+    <!-- Canvas — pixel dimensions set dynamically when image loads -->
+    <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="canvas" width="1" height="1"></canvas>
     </div>
 </main>
 
@@ -345,7 +336,8 @@
     <span id="st-size">No image loaded</span>
     <span>·</span>
     <span id="st-pos"></span>
-    <span style="margin-left:auto" id="st-undo"></span>
+    <span style="margin-left:auto" id="st-zoom"></span>
+    <span id="st-undo"></span>
 </footer>
 
 <script>
@@ -354,6 +346,7 @@
 /* ── Element references ───────────────────────────────────────── */
 const canvas      = document.getElementById('canvas');
 const ctx         = canvas.getContext('2d', { willReadFrequently: true });
+const canvasArea  = document.getElementById('canvas-area');
 const canvasWrap  = document.getElementById('canvas-wrap');
 const dropOverlay = document.getElementById('drop-overlay');
 const brushCursor = document.getElementById('brush-cursor');
@@ -391,6 +384,11 @@ const MAX_UNDO  = 25;
 const undoStack = [];          // Array<ImageData>
 const redoStack = [];          // Array<ImageData>
 
+/* ── View state (zoom / pan) ──────────────────────────────────── */
+let viewX = 0, viewY = 0, viewScale = 1;
+let prevPinch = null;   // { p1, p2 } — previous 2-finger touch positions
+let tapTimer  = null;   // double-tap timer (resets view)
+
 /* ── Image loading ────────────────────────────────────────────── */
 function loadImage(file) {
     if (!file || !file.type.startsWith('image/')) return;
@@ -405,6 +403,7 @@ function loadImage(file) {
             undoStack.length = 0;
             redoStack.length = 0;
             dropOverlay.classList.add('hidden');
+            initView();   // fit & center the newly loaded image
             refresh();
         };
         img.onerror = () => alert('Could not load image.');
@@ -541,6 +540,24 @@ function drawBrush(x, y) {
     lastPos = { x, y };
 }
 
+/* ── View: zoom & pan ────────────────────────────────────────── */
+function applyView() {
+    canvasWrap.style.transform = `translate(${viewX}px, ${viewY}px) scale(${viewScale})`;
+    const stZoom = document.getElementById('st-zoom');
+    if (stZoom) stZoom.textContent = Math.round(viewScale * 100) + '%';
+}
+
+// Fit the image to the visible area and center it.
+function initView() {
+    const areaW = canvasArea.clientWidth;
+    const areaH = canvasArea.clientHeight;
+    const s = Math.min((areaW - 40) / canvas.width, (areaH - 40) / canvas.height, 1);
+    viewScale = Math.max(s, 0.05);
+    viewX = (areaW - canvas.width  * viewScale) / 2;
+    viewY = (areaH - canvas.height * viewScale) / 2;
+    applyView();
+}
+
 /* ── Pointer event handlers ───────────────────────────────────── */
 function onDown(e) {
     if (!imageLoaded) return;
@@ -599,28 +616,108 @@ canvas.addEventListener('mousemove',  onMove);
 canvas.addEventListener('mouseup',    onUp);
 canvas.addEventListener('mouseleave', onLeave);
 
-// Touch (passive:false so we can call preventDefault to block scroll during brush)
-canvas.addEventListener('touchstart',  onDown,  { passive: false });
-canvas.addEventListener('touchmove',   onMove,  { passive: false });
-canvas.addEventListener('touchend',    onUp);
-canvas.addEventListener('touchcancel', onUp);
+// Touch — 1 finger = draw/fill; 2 fingers = pinch-zoom + pan
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+        // Single finger: draw or fill
+        const { x, y } = getPos(e);
+        if (currentTool === 'bucket') {
+            floodFill(x, y);
+        } else {
+            saveState();
+            isDrawing = true;
+            lastPos   = null;
+            drawBrush(x, y);
+        }
+        // Double-tap resets the view
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
+            initView();
+        } else {
+            tapTimer = setTimeout(() => { tapTimer = null; }, 300);
+        }
+    } else if (e.touches.length >= 2) {
+        // Two fingers: cancel active stroke and begin pinch/pan
+        isDrawing = false;
+        lastPos   = null;
+        prevPinch = { p1: e.touches[0], p2: e.touches[1] };
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && isDrawing && currentTool === 'brush') {
+        const { x, y } = getPos(e);
+        drawBrush(x, y);
+    } else if (e.touches.length >= 2 && prevPinch) {
+        isDrawing = false;
+        lastPos   = null;
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const curDist  = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const prevDist = Math.hypot(
+            prevPinch.p2.clientX - prevPinch.p1.clientX,
+            prevPinch.p2.clientY - prevPinch.p1.clientY
+        );
+        const ds = curDist / prevDist;
+        // Midpoints in client coordinates
+        const prevMidX = (prevPinch.p1.clientX + prevPinch.p2.clientX) / 2;
+        const prevMidY = (prevPinch.p1.clientY + prevPinch.p2.clientY) / 2;
+        const curMidX  = (t1.clientX + t2.clientX) / 2;
+        const curMidY  = (t1.clientY + t2.clientY) / 2;
+        // Convert to canvas-area-local coordinates
+        const areaRect = canvasArea.getBoundingClientRect();
+        const pmx = prevMidX - areaRect.left;
+        const pmy = prevMidY - areaRect.top;
+        const cmx = curMidX  - areaRect.left;
+        const cmy = curMidY  - areaRect.top;
+        // Zoom around prevMid, then pan to curMid (combined in one step)
+        viewX = cmx - (pmx - viewX) * ds;
+        viewY = cmy - (pmy - viewY) * ds;
+        viewScale = Math.min(Math.max(viewScale * ds, 0.05), 20);
+        applyView();
+        prevPinch = { p1: t1, p2: t2 };
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+    if (e.touches.length < 2) prevPinch = null;
+    if (e.touches.length === 0) { isDrawing = false; lastPos = null; }
+});
+canvas.addEventListener('touchcancel', () => {
+    isDrawing = false; lastPos = null; prevPinch = null;
+});
+
+/* ── Mouse-wheel zoom ─────────────────────────────────────────── */
+canvasArea.addEventListener('wheel', e => {
+    e.preventDefault();
+    const ds = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const areaRect = canvasArea.getBoundingClientRect();
+    const mx = e.clientX - areaRect.left;
+    const my = e.clientY - areaRect.top;
+    viewX = mx - (mx - viewX) * ds;
+    viewY = my - (my - viewY) * ds;
+    viewScale = Math.min(Math.max(viewScale * ds, 0.05), 20);
+    applyView();
+}, { passive: false });
 
 /* ── Drag & drop ──────────────────────────────────────────────── */
 ['dragenter', 'dragover'].forEach(evt =>
-    canvasWrap.addEventListener(evt, e => {
+    canvasArea.addEventListener(evt, e => {
         e.preventDefault();
-        canvasWrap.classList.add('drag-over');
+        canvasArea.classList.add('drag-over');
     })
 );
 ['dragleave', 'drop'].forEach(evt =>
-    canvasWrap.addEventListener(evt, e => {
+    canvasArea.addEventListener(evt, e => {
         e.preventDefault();
-        canvasWrap.classList.remove('drag-over');
+        canvasArea.classList.remove('drag-over');
     })
 );
-canvasWrap.addEventListener('drop', e => {
+canvasArea.addEventListener('drop', e => {
     e.preventDefault();
-    canvasWrap.classList.remove('drag-over');
+    canvasArea.classList.remove('drag-over');
     if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
 });
 
@@ -686,6 +783,7 @@ document.addEventListener('keydown', e => {
     if (ctrl && e.key === 's')                 { e.preventDefault(); download(); }
     if (!ctrl && !e.altKey && e.key === 'b')   { setTool('bucket'); }
     if (!ctrl && !e.altKey && e.key === 'r')   { setTool('brush'); }
+    if (!ctrl && !e.altKey && e.key === 'f')   { initView(); }   // F = fit to screen
 });
 
 /* ── Init ─────────────────────────────────────────────────────── */
