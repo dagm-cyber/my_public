@@ -316,6 +316,20 @@
         <span>Redo</span>
     </button>
 
+    <!-- Shown only while a polygon/ellipse shape is pending adjustment -->
+    <button class="btn" id="btn-cancel-shape" title="Cancel shape (Esc)" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+        <span>Cancel</span>
+    </button>
+    <button class="btn accent" id="btn-apply" title="Apply shape (Enter)" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+        </svg>
+        <span>Apply</span>
+    </button>
+
     <button class="btn accent" id="btn-download" title="Download PNG — Ctrl+S" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 8h14v2H5v-2z"/>
@@ -381,6 +395,8 @@ const btnBucket   = document.getElementById('btn-bucket');
 const btnBrush    = document.getElementById('btn-brush');
 const btnPolygon  = document.getElementById('btn-polygon');
 const btnEllipse  = document.getElementById('btn-ellipse');
+const btnApply    = document.getElementById('btn-apply');
+const btnCancelShape = document.getElementById('btn-cancel-shape');
 const btnUpload   = document.getElementById('btn-upload');
 const btnUndo     = document.getElementById('btn-undo');
 const btnRedo     = document.getElementById('btn-redo');
@@ -409,6 +425,14 @@ const redoStack = [];          // Array<ImageData>
 /* ── Shape tool state ─────────────────────────────────────────── */
 let polygonPts   = [];    // Array<{x,y}> placed polygon vertices (canvas coords)
 let ellipseStart = null;  // {x,y} drag-start of current ellipse (canvas coords)
+
+/* ── Pending shape (adjust mode) ─────────────────────────────── */
+// After closing a polygon or releasing an ellipse drag the shape enters
+// adjust mode — it is not yet committed to the main canvas.
+let pendingShape    = null;  // { type:'polygon', pts, color } | { type:'ellipse', cx,cy,rx,ry, color }
+let adjustDragIdx   = -1;    // index of handle currently being dragged
+let adjustDragStart = null;  // { x, y } canvas coords when drag began
+let adjustOrigShape = null;  // deep-copy of pendingShape at drag start
 
 /* ── View state (zoom / pan) ──────────────────────────────────── */
 let viewX = 0, viewY = 0, viewScale = 1;
@@ -573,6 +597,157 @@ function clearOverlay() {
     overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 }
 
+/* ── Pending shape: adjust mode helpers ───────────────────────── */
+
+// Returns the 9 drag handles for an ellipse shape (8 edges + centre).
+function getEllipseHandles(s) {
+    const { cx, cy, rx, ry } = s;
+    return [
+        { x: cx,    y: cy-ry, t: 'n'  },
+        { x: cx+rx, y: cy-ry, t: 'ne' },
+        { x: cx+rx, y: cy,    t: 'e'  },
+        { x: cx+rx, y: cy+ry, t: 'se' },
+        { x: cx,    y: cy+ry, t: 's'  },
+        { x: cx-rx, y: cy+ry, t: 'sw' },
+        { x: cx-rx, y: cy,    t: 'w'  },
+        { x: cx-rx, y: cy-ry, t: 'nw' },
+        { x: cx,    y: cy,    t: 'c'  },  // centre — move whole ellipse
+    ];
+}
+
+// Returns the index of the handle under (x,y), or -1 if none.
+function hitTestHandles(x, y) {
+    if (!pendingShape) return -1;
+    const hitR    = Math.max(6, 12 / viewScale);   // 12 display-px hit radius
+    const handles = pendingShape.type === 'polygon'
+        ? pendingShape.pts
+        : getEllipseHandles(pendingShape);
+    for (let i = 0; i < handles.length; i++) {
+        if (Math.hypot(x - handles[i].x, y - handles[i].y) < hitR) return i;
+    }
+    return -1;
+}
+
+// Applies the drag delta to the pending shape.
+function applyAdjustDrag(x, y) {
+    if (!pendingShape || adjustDragIdx === -1 || !adjustOrigShape) return;
+    if (pendingShape.type === 'polygon') {
+        const orig = adjustOrigShape.pts[adjustDragIdx];
+        const dx = x - adjustDragStart.x;
+        const dy = y - adjustDragStart.y;
+        pendingShape.pts[adjustDragIdx] = { x: orig.x + dx, y: orig.y + dy };
+    } else {
+        const handles = getEllipseHandles(adjustOrigShape);
+        const ht = handles[adjustDragIdx].t;
+        const { cx, cy, rx, ry } = adjustOrigShape;
+        if (ht === 'c') {
+            pendingShape.cx = cx + (x - adjustDragStart.x);
+            pendingShape.cy = cy + (y - adjustDragStart.y);
+        } else {
+            let t = cy - ry, b = cy + ry, l = cx - rx, r = cx + rx;
+            if (ht === 'n'  || ht === 'ne' || ht === 'nw') t = y;
+            if (ht === 's'  || ht === 'se' || ht === 'sw') b = y;
+            if (ht === 'e'  || ht === 'ne' || ht === 'se') r = x;
+            if (ht === 'w'  || ht === 'nw' || ht === 'sw') l = x;
+            if (r - l < 4) r = l + 4;
+            if (b - t < 4) b = t + 4;
+            pendingShape.cx = (l + r) / 2;
+            pendingShape.cy = (t + b) / 2;
+            pendingShape.rx = (r - l) / 2;
+            pendingShape.ry = (b - t) / 2;
+        }
+    }
+}
+
+// Redraws the pending shape (semi-transparent fill + dashed border + handles).
+function drawPendingShape() {
+    clearOverlay();
+    if (!pendingShape) return;
+    const [r, g, b] = hexToRgb(pendingShape.color);
+    const lw      = Math.max(0.5, 1.5 / viewScale);
+    const dashLen = Math.max(2, 5 / viewScale);
+    const hr      = Math.max(2, 7 / viewScale);
+
+    overlayCtx.save();
+    overlayCtx.lineWidth   = lw;
+    overlayCtx.setLineDash([dashLen, dashLen]);
+    overlayCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+    overlayCtx.shadowColor = 'rgba(0,0,0,0.55)';
+    overlayCtx.shadowBlur  = 3 / viewScale;
+    overlayCtx.beginPath();
+    if (pendingShape.type === 'polygon') {
+        pendingShape.pts.forEach((p, i) =>
+            i === 0 ? overlayCtx.moveTo(p.x, p.y) : overlayCtx.lineTo(p.x, p.y));
+        overlayCtx.closePath();
+    } else {
+        const { cx, cy, rx, ry } = pendingShape;
+        overlayCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    }
+    overlayCtx.fillStyle = `rgba(${r},${g},${b},0.35)`;
+    overlayCtx.fill();
+    overlayCtx.stroke();
+    overlayCtx.restore();
+
+    // Draw handles
+    const handles = pendingShape.type === 'polygon'
+        ? pendingShape.pts
+        : getEllipseHandles(pendingShape);
+    handles.forEach((h, i) => {
+        const isCentre   = pendingShape.type === 'ellipse' && h.t === 'c';
+        const isDragging = i === adjustDragIdx;
+        overlayCtx.beginPath();
+        overlayCtx.arc(h.x, h.y, hr * (isCentre ? 0.65 : 1), 0, Math.PI * 2);
+        overlayCtx.fillStyle   = isDragging ? pendingShape.color : '#fff';
+        overlayCtx.fill();
+        overlayCtx.lineWidth   = lw;
+        overlayCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+        overlayCtx.stroke();
+    });
+}
+
+// Commits the pending shape to the main canvas.
+function applyPendingShape() {
+    if (!pendingShape) return;
+    saveState();
+    ctx.fillStyle = pendingShape.color;
+    ctx.beginPath();
+    if (pendingShape.type === 'polygon') {
+        pendingShape.pts.forEach((p, i) =>
+            i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+    } else {
+        const { cx, cy, rx, ry } = pendingShape;
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    cancelPendingShape();
+}
+
+// Discards the pending shape without filling.
+function cancelPendingShape() {
+    pendingShape    = null;
+    adjustDragIdx   = -1;
+    adjustDragStart = null;
+    adjustOrigShape = null;
+    clearOverlay();
+    updateAdjustUI();
+}
+
+// Shows/hides the Apply & Cancel buttons and updates the status hint.
+function updateAdjustUI() {
+    const active = !!pendingShape;
+    btnApply.style.display       = active ? '' : 'none';
+    btnCancelShape.style.display = active ? '' : 'none';
+    if (active) {
+        stTool.textContent  = 'Adjust — drag handles to modify · Enter or Apply to fill · Esc to cancel';
+        canvas.style.cursor = 'default';
+    } else {
+        stTool.textContent  = TOOL_HINTS[currentTool] || currentTool;
+        canvas.style.cursor = '';
+        canvas.classList.toggle('brush-mode', currentTool === 'brush');
+    }
+}
+
 /* ── Polygon tool ─────────────────────────────────────────────── */
 // Redraws the in-progress polygon on the overlay canvas.
 // cx, cy = current cursor position in canvas pixels (null = no cursor)
@@ -633,19 +808,20 @@ function handlePolygonDown(x, y) {
 
 function commitPolygon() {
     if (polygonPts.length < 3) { cancelPolygon(); return; }
-    saveState();
-    ctx.fillStyle = colorPicker.value;
-    ctx.beginPath();
-    polygonPts.forEach((p, i) =>
-        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    ctx.fill();
-    cancelPolygon();
+    // Enter adjust mode — do NOT fill yet
+    pendingShape = {
+        type:  'polygon',
+        pts:   polygonPts.map(p => ({ ...p })),
+        color: colorPicker.value
+    };
+    polygonPts = [];
+    drawPendingShape();
+    updateAdjustUI();
 }
 
 function cancelPolygon() {
     polygonPts = [];
-    clearOverlay();
+    if (!pendingShape) clearOverlay();
 }
 
 /* ── Ellipse tool ─────────────────────────────────────────────── */
@@ -676,17 +852,19 @@ function commitEllipse(ex, ey) {
     const rx = Math.abs(ex - ellipseStart.x) / 2;
     const ry = Math.abs(ey - ellipseStart.y) / 2;
     if (rx >= 2 && ry >= 2) {
-        saveState();
-        ctx.fillStyle = colorPicker.value;
-        ctx.beginPath();
-        ctx.ellipse(
-            (ex + ellipseStart.x) / 2, (ey + ellipseStart.y) / 2,
-            rx, ry, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // Enter adjust mode — do NOT fill yet
+        pendingShape = {
+            type:  'ellipse',
+            cx:    (ex + ellipseStart.x) / 2,
+            cy:    (ey + ellipseStart.y) / 2,
+            rx, ry,
+            color: colorPicker.value
+        };
+        drawPendingShape();
+        updateAdjustUI();
     }
     ellipseStart = null;
     isDrawing    = false;
-    clearOverlay();
 }
 
 /* ── View: zoom & pan ────────────────────────────────────────── */
@@ -714,6 +892,18 @@ function onDown(e) {
     const { x, y } = getPos(e);
     lastKnownPos = { x, y };
 
+    // ── Adjust mode: drag a handle on the pending shape ──────────
+    if (pendingShape) {
+        const idx = hitTestHandles(x, y);
+        if (idx !== -1) {
+            adjustDragIdx   = idx;
+            adjustDragStart = { x, y };
+            adjustOrigShape = JSON.parse(JSON.stringify(pendingShape));
+            isDrawing = true;
+        }
+        return;  // ignore clicks outside handles while a shape is pending
+    }
+
     if (currentTool === 'bucket') {
         floodFill(x, y);
     } else if (currentTool === 'brush') {
@@ -733,8 +923,19 @@ function onMove(e) {
     if (!imageLoaded) return;
     const pos = getPos(e);
     lastKnownPos = { x: pos.x, y: pos.y };
-
     stPos.textContent = `${pos.x} × ${pos.y}`;
+
+    // ── Adjust mode ──────────────────────────────────────────────
+    if (pendingShape) {
+        if (isDrawing && adjustDragIdx !== -1) {
+            e.preventDefault();
+            applyAdjustDrag(pos.x, pos.y);
+            drawPendingShape();
+        } else if (!e.touches) {
+            canvas.style.cursor = hitTestHandles(pos.x, pos.y) !== -1 ? 'grab' : 'default';
+        }
+        return;
+    }
 
     // Desktop brush cursor ring
     if (currentTool === 'brush' && !e.touches) {
@@ -759,6 +960,15 @@ function onMove(e) {
 }
 
 function onUp() {
+    // ── Finish adjust drag ───────────────────────────────────────
+    if (adjustDragIdx !== -1) {
+        adjustDragIdx   = -1;
+        adjustDragStart = null;
+        adjustOrigShape = null;
+        isDrawing = false;
+        if (pendingShape && !navigator.maxTouchPoints) canvas.style.cursor = 'default';
+        return;
+    }
     if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
         commitEllipse(lastKnownPos.x, lastKnownPos.y);
     } else {
@@ -768,7 +978,14 @@ function onUp() {
 }
 
 function onLeave() {
-    if (currentTool === 'polygon' && polygonPts.length > 0) {
+    if (pendingShape) {
+        // Finish any adjust drag that was in progress
+        if (adjustDragIdx !== -1) {
+            adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
+            isDrawing = false;
+        }
+        canvas.style.cursor = 'default';
+    } else if (currentTool === 'polygon' && polygonPts.length > 0) {
         drawPolygonPreview(null, null);  // hide ghost line, keep placed points
     } else {
         onUp();
@@ -783,25 +1000,34 @@ canvas.addEventListener('mousemove',  onMove);
 canvas.addEventListener('mouseup',    onUp);
 canvas.addEventListener('mouseleave', onLeave);
 
-// Touch — 1 finger = draw / fill / polygon; 2 fingers = pinch-zoom + pan
+// Touch — 1 finger = draw / fill / polygon / adjust; 2 fingers = pinch-zoom + pan
 canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     if (e.touches.length === 1) {
         const { x, y } = getPos(e);
         lastKnownPos = { x, y };
 
-        // Double-tap: close polygon (if in progress with ≥3 pts) or reset view
+        // Double-tap: apply pending shape OR close polygon OR reset view
         const wasDoubleTap = !!tapTimer;
         if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
         tapTimer = setTimeout(() => { tapTimer = null; }, 300);
 
         if (wasDoubleTap) {
-            if (currentTool === 'polygon' && polygonPts.length >= 3) {
-                commitPolygon(); return;
-            } else if (currentTool !== 'polygon') {
-                initView(); return;
+            if (pendingShape)                                   { applyPendingShape(); return; }
+            if (currentTool === 'polygon' && polygonPts.length >= 3) { commitPolygon(); return; }
+            if (currentTool !== 'polygon')                      { initView(); return; }
+        }
+
+        // Adjust mode: hit-test handles
+        if (pendingShape) {
+            const idx = hitTestHandles(x, y);
+            if (idx !== -1) {
+                adjustDragIdx   = idx;
+                adjustDragStart = { x, y };
+                adjustOrigShape = JSON.parse(JSON.stringify(pendingShape));
+                isDrawing = true;
             }
-            // polygon with < 3 points: fall through, add the point normally
+            return;
         }
 
         if (currentTool === 'bucket') {
@@ -819,7 +1045,8 @@ canvas.addEventListener('touchstart', e => {
         }
     } else if (e.touches.length >= 2) {
         // Two fingers: cancel any active stroke/shape, start pinch/pan
-        if (currentTool === 'ellipse' && isDrawing) { ellipseStart = null; clearOverlay(); }
+        if (currentTool === 'ellipse' && isDrawing && !pendingShape) { ellipseStart = null; clearOverlay(); }
+        if (adjustDragIdx !== -1) { adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null; }
         isDrawing = false;
         lastPos   = null;
         prevPinch = { p1: e.touches[0], p2: e.touches[1] };
@@ -831,7 +1058,10 @@ canvas.addEventListener('touchmove', e => {
     if (e.touches.length === 1) {
         const { x, y } = getPos(e);
         lastKnownPos = { x, y };
-        if (isDrawing && currentTool === 'brush') {
+        if (pendingShape && isDrawing && adjustDragIdx !== -1) {
+            applyAdjustDrag(x, y);
+            drawPendingShape();
+        } else if (isDrawing && currentTool === 'brush') {
             drawBrush(x, y);
         } else if (isDrawing && currentTool === 'ellipse' && ellipseStart) {
             drawEllipsePreview(x, y);
@@ -863,7 +1093,10 @@ canvas.addEventListener('touchmove', e => {
 
 canvas.addEventListener('touchend', e => {
     if (e.touches.length === 0) {
-        if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
+        if (adjustDragIdx !== -1) {
+            adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
+            isDrawing = false;
+        } else if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
             commitEllipse(lastKnownPos.x, lastKnownPos.y);
         } else {
             isDrawing = false;
@@ -874,7 +1107,9 @@ canvas.addEventListener('touchend', e => {
 });
 canvas.addEventListener('touchcancel', () => {
     isDrawing = false; lastPos = null; prevPinch = null;
-    ellipseStart = null; clearOverlay();
+    adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
+    ellipseStart = null;
+    if (!pendingShape) clearOverlay();
 });
 
 /* ── Mouse-wheel zoom ─────────────────────────────────────────── */
@@ -927,7 +1162,8 @@ const TOOL_HINTS = {
 };
 
 function setTool(tool) {
-    // Clean up previous tool's in-progress state
+    // Cancel any in-progress or pending shapes
+    cancelPendingShape();
     if (currentTool === 'polygon') cancelPolygon();
     if (currentTool === 'ellipse') { ellipseStart = null; isDrawing = false; clearOverlay(); }
 
@@ -941,6 +1177,7 @@ function setTool(tool) {
     ctrlBrush.style.display     = tool === 'brush'  ? '' : 'none';
 
     canvas.classList.toggle('brush-mode', tool === 'brush');
+    canvas.style.cursor = '';
     brushCursor.style.display = 'none';
     stTool.textContent = TOOL_HINTS[tool] || tool;
 }
@@ -971,6 +1208,8 @@ fileInput.addEventListener('change', () => {
     fileInput.value = '';   // reset so the same file can be reloaded
 });
 
+btnApply.addEventListener('click',       applyPendingShape);
+btnCancelShape.addEventListener('click', cancelPendingShape);
 btnUndo.addEventListener('click',     undo);
 btnRedo.addEventListener('click',     redo);
 btnDownload.addEventListener('click', download);
@@ -991,8 +1230,14 @@ document.addEventListener('keydown', e => {
     if (!ctrl && !e.altKey && e.key === 'p')       { setTool('polygon'); }
     if (!ctrl && !e.altKey && e.key === 'e')       { setTool('ellipse'); }
     if (!ctrl && !e.altKey && e.key === 'f')       { initView(); }
-    if (e.key === 'Escape')                        { if (currentTool === 'polygon') cancelPolygon(); }
-    if (e.key === 'Enter' && !e.isComposing)       { if (currentTool === 'polygon' && polygonPts.length >= 3) commitPolygon(); }
+    if (e.key === 'Escape') {
+        if (pendingShape)                    cancelPendingShape();
+        else if (currentTool === 'polygon') cancelPolygon();
+    }
+    if (e.key === 'Enter' && !e.isComposing) {
+        if (pendingShape)                                            applyPendingShape();
+        else if (currentTool === 'polygon' && polygonPts.length >= 3) commitPolygon();
+    }
 });
 
 /* ── Init ─────────────────────────────────────────────────────── */
