@@ -436,9 +436,17 @@ const undoStack = [];          // Array<ImageData>
 const redoStack = [];          // Array<ImageData>
 
 /* ── Shape tool state ─────────────────────────────────────────── */
-let polygonPts      = [];    // Array<{x,y}> placed polygon vertices (canvas coords)
-let polygonDraftActive = false; // true while the last polygon point is still being dragged into position (mobile)
+let polygonPts         = [];   // Array<{x,y}> placed polygon vertices (canvas coords)
+let polygonDraftActive = false; // true while the last polygon point can still be dragged (mobile)
+let polygonDraftFingerPos = null; // actual finger canvas position during draft (without offset)
 let ellipseStart = null;  // {x,y} drag-start of current ellipse (canvas coords)
+
+// Returns the above-finger vertical offset in canvas pixels.
+// The draft point is placed 70 display pixels ABOVE the finger so it isn't hidden under it.
+function draftOffset() {
+    const rect = canvas.getBoundingClientRect();
+    return 70 * (canvas.height / rect.height);
+}
 
 /* ── Pending shape (adjust mode) ─────────────────────────────── */
 // After closing a polygon or releasing an ellipse drag the shape enters
@@ -861,8 +869,9 @@ function commitPolygon() {
 }
 
 function cancelPolygon() {
-    polygonPts         = [];
-    polygonDraftActive = false;
+    polygonPts            = [];
+    polygonDraftActive    = false;
+    polygonDraftFingerPos = null;
     if (!pendingShape) clearOverlay();
 }
 
@@ -1103,17 +1112,19 @@ canvas.addEventListener('touchstart', e => {
                     commitPolygon(); return;
                 }
             }
-            // Push a draft point — touchmove can drag it before touchend commits it
-            polygonPts.push({ x, y });
-            polygonDraftActive = true;
-            drawPolygonPreview(x, y);
+            // Push draft point ABOVE the finger (70 display px offset) so it isn't hidden under the finger
+            const dOff = draftOffset();
+            polygonPts.push({ x, y: y - dOff });
+            polygonDraftActive    = true;
+            polygonDraftFingerPos = { x, y };
+            drawPolygonPreview(x, y - dOff);
         } else if (currentTool === 'ellipse') {
             ellipseStart = { x, y };
             isDrawing    = true;
         }
     } else if (e.touches.length >= 2) {
         // Two fingers: cancel any active stroke/shape, start pinch/pan
-        if (polygonDraftActive) polygonDraftActive = false;  // commit draft at current position
+        if (polygonDraftActive) { polygonDraftActive = false; polygonDraftFingerPos = null; }
         if (currentTool === 'ellipse' && isDrawing && !pendingShape) { ellipseStart = null; clearOverlay(); }
         if (adjustDragIdx !== -1) { adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null; }
         isDrawing = false;
@@ -1131,9 +1142,11 @@ canvas.addEventListener('touchmove', e => {
             applyAdjustDrag(x, y);
             drawPendingShape();
         } else if (polygonDraftActive && currentTool === 'polygon' && polygonPts.length > 0) {
-            // Drag the most recently placed point to fine-tune its position before committing
-            polygonPts[polygonPts.length - 1] = { x, y };
-            drawPolygonPreview(x, y);
+            // Drag the draft point (with above-finger offset) to fine-tune its position
+            const dOff = draftOffset();
+            polygonDraftFingerPos = { x, y };
+            polygonPts[polygonPts.length - 1] = { x, y: y - dOff };
+            drawPolygonPreview(x, y - dOff);
         } else if (isDrawing && currentTool === 'brush') {
             drawBrush(x, y);
         } else if (isDrawing && currentTool === 'ellipse' && ellipseStart) {
@@ -1167,8 +1180,9 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener('touchend', e => {
     if (e.touches.length === 0) {
         if (polygonDraftActive) {
-            // Commit the draft point at wherever the finger was lifted
-            polygonDraftActive = false;
+            // Commit the draft point at its current (offset) position
+            polygonDraftActive    = false;
+            polygonDraftFingerPos = null;
             drawPolygonPreview(null, null);  // redraw without draft indicator
         } else if (adjustDragIdx !== -1) {
             adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
@@ -1184,7 +1198,8 @@ canvas.addEventListener('touchend', e => {
 });
 canvas.addEventListener('touchcancel', () => {
     isDrawing = false; lastPos = null; prevPinch = null;
-    polygonDraftActive = false;
+    polygonDraftActive    = false;
+    polygonDraftFingerPos = null;
     adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
     ellipseStart = null;
     if (!pendingShape) clearOverlay();
