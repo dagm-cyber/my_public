@@ -917,6 +917,7 @@ function initView() {
 /* ── Pointer event handlers ───────────────────────────────────── */
 function onDown(e) {
     if (!imageLoaded) return;
+    if (e.button !== 0) return;  // ignore right-click (button=2) and middle-click (button=1)
     e.preventDefault();
     const { x, y } = getPos(e);
     lastKnownPos = { x, y };
@@ -1029,9 +1030,23 @@ canvas.addEventListener('mousemove',  onMove);
 canvas.addEventListener('mouseup',    onUp);
 canvas.addEventListener('mouseleave', onLeave);
 
+// Cancel any in-progress drawing when the browser context menu opens
+// (right-click on desktop, long-press on mobile) so no ghost stroke is left behind.
+canvas.addEventListener('contextmenu', () => {
+    isDrawing    = false;
+    lastPos      = null;
+    ellipseStart = null;
+    if (adjustDragIdx !== -1) {
+        adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
+    }
+    // Do NOT call e.preventDefault() — the whole point is to let the menu appear
+});
+
 // Touch — 1 finger = draw / fill / polygon / adjust; 2 fingers = pinch-zoom + pan
+// Note: e.preventDefault() is intentionally NOT called on touchstart.
+// touch-action:none CSS already blocks scroll/zoom without it, and omitting it
+// allows the browser's long-press context menu to appear on mobile.
 canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
     if (e.touches.length === 1) {
         const { x, y } = getPos(e);
         lastKnownPos = { x, y };
