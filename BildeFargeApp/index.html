@@ -436,7 +436,8 @@ const undoStack = [];          // Array<ImageData>
 const redoStack = [];          // Array<ImageData>
 
 /* ── Shape tool state ─────────────────────────────────────────── */
-let polygonPts   = [];    // Array<{x,y}> placed polygon vertices (canvas coords)
+let polygonPts      = [];    // Array<{x,y}> placed polygon vertices (canvas coords)
+let polygonDraftActive = false; // true while the last polygon point is still being dragged into position (mobile)
 let ellipseStart = null;  // {x,y} drag-start of current ellipse (canvas coords)
 
 /* ── Pending shape (adjust mode) ─────────────────────────────── */
@@ -812,14 +813,25 @@ function drawPolygonPreview(cx, cy) {
 
     // Draw point handles
     polygonPts.forEach((p, i) => {
-        const snap = i === 0 && nearFirst;
+        const snap    = i === 0 && nearFirst;
+        const isDraft = polygonDraftActive && i === polygonPts.length - 1;
         overlayCtx.beginPath();
-        overlayCtx.arc(p.x, p.y, hr * (snap ? 1.8 : 1), 0, Math.PI * 2);
-        overlayCtx.fillStyle   = snap ? colorPicker.value : '#fff';
+        overlayCtx.arc(p.x, p.y, hr * (snap ? 1.8 : isDraft ? 2.2 : 1), 0, Math.PI * 2);
+        overlayCtx.fillStyle   = (snap || isDraft) ? colorPicker.value : '#fff';
         overlayCtx.fill();
         overlayCtx.lineWidth   = lw;
         overlayCtx.strokeStyle = i === 0 ? colorPicker.value : 'rgba(0,0,0,0.45)';
         overlayCtx.stroke();
+        // Pulsing outer ring on the draft point so the user knows it’s still moveable
+        if (isDraft) {
+            overlayCtx.beginPath();
+            overlayCtx.arc(p.x, p.y, hr * 3.5, 0, Math.PI * 2);
+            overlayCtx.setLineDash([]);  // solid ring
+            overlayCtx.strokeStyle = 'rgba(255,255,255,0.45)';
+            overlayCtx.lineWidth   = lw;
+            overlayCtx.stroke();
+            overlayCtx.setLineDash([dashLen, dashLen]);  // restore dash for next iteration
+        }
     });
 }
 
@@ -849,7 +861,8 @@ function commitPolygon() {
 }
 
 function cancelPolygon() {
-    polygonPts = [];
+    polygonPts         = [];
+    polygonDraftActive = false;
     if (!pendingShape) clearOverlay();
 }
 
@@ -1082,13 +1095,25 @@ canvas.addEventListener('touchstart', e => {
             lastPos   = null;
             drawBrush(x, y);
         } else if (currentTool === 'polygon') {
-            handlePolygonDown(x, y);
+            // Check snap-to-close BEFORE adding a draft point
+            if (polygonPts.length >= 3) {
+                const rect  = canvas.getBoundingClientRect();
+                const snapT = 15 * (canvas.width / rect.width);
+                if (Math.hypot(x - polygonPts[0].x, y - polygonPts[0].y) < snapT) {
+                    commitPolygon(); return;
+                }
+            }
+            // Push a draft point — touchmove can drag it before touchend commits it
+            polygonPts.push({ x, y });
+            polygonDraftActive = true;
+            drawPolygonPreview(x, y);
         } else if (currentTool === 'ellipse') {
             ellipseStart = { x, y };
             isDrawing    = true;
         }
     } else if (e.touches.length >= 2) {
         // Two fingers: cancel any active stroke/shape, start pinch/pan
+        if (polygonDraftActive) polygonDraftActive = false;  // commit draft at current position
         if (currentTool === 'ellipse' && isDrawing && !pendingShape) { ellipseStart = null; clearOverlay(); }
         if (adjustDragIdx !== -1) { adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null; }
         isDrawing = false;
@@ -1105,6 +1130,10 @@ canvas.addEventListener('touchmove', e => {
         if (pendingShape && isDrawing && adjustDragIdx !== -1) {
             applyAdjustDrag(x, y);
             drawPendingShape();
+        } else if (polygonDraftActive && currentTool === 'polygon' && polygonPts.length > 0) {
+            // Drag the most recently placed point to fine-tune its position before committing
+            polygonPts[polygonPts.length - 1] = { x, y };
+            drawPolygonPreview(x, y);
         } else if (isDrawing && currentTool === 'brush') {
             drawBrush(x, y);
         } else if (isDrawing && currentTool === 'ellipse' && ellipseStart) {
@@ -1137,7 +1166,11 @@ canvas.addEventListener('touchmove', e => {
 
 canvas.addEventListener('touchend', e => {
     if (e.touches.length === 0) {
-        if (adjustDragIdx !== -1) {
+        if (polygonDraftActive) {
+            // Commit the draft point at wherever the finger was lifted
+            polygonDraftActive = false;
+            drawPolygonPreview(null, null);  // redraw without draft indicator
+        } else if (adjustDragIdx !== -1) {
             adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
             isDrawing = false;
         } else if (currentTool === 'ellipse' && isDrawing && ellipseStart && lastKnownPos) {
@@ -1151,6 +1184,7 @@ canvas.addEventListener('touchend', e => {
 });
 canvas.addEventListener('touchcancel', () => {
     isDrawing = false; lastPos = null; prevPinch = null;
+    polygonDraftActive = false;
     adjustDragIdx = -1; adjustDragStart = null; adjustOrigShape = null;
     ellipseStart = null;
     if (!pendingShape) clearOverlay();
