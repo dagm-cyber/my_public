@@ -274,6 +274,17 @@
 
     <div class="sep"></div>
 
+    <!-- Opacity (applies to all tools) -->
+    <div class="ctrl">
+        <div class="ctrl-header">
+            <span>Opacity</span>
+            <output id="opacity-out">100</output>%
+        </div>
+        <input type="range" id="opacity-range" min="1" max="100" value="100" aria-label="Paint opacity">
+    </div>
+
+    <div class="sep"></div>
+
     <!-- Tolerance (bucket) -->
     <div class="ctrl" id="ctrl-tolerance">
         <div class="ctrl-header">
@@ -385,8 +396,10 @@ const dropOverlay = document.getElementById('drop-overlay');
 const brushCursor = document.getElementById('brush-cursor');
 const fileInput   = document.getElementById('file-input');
 
-const colorPicker = document.getElementById('color-picker');
-const tolRange    = document.getElementById('tol-range');
+const colorPicker  = document.getElementById('color-picker');
+const opacityRange = document.getElementById('opacity-range');
+const opacityOut   = document.getElementById('opacity-out');
+const tolRange     = document.getElementById('tol-range');
 const tolOut      = document.getElementById('tol-out');
 const sizeRange   = document.getElementById('size-range');
 const sizeOut     = document.getElementById('size-out');
@@ -530,6 +543,11 @@ function floodFill(startX, startY) {
     const visited = new Uint8Array(total);  // bit-flag per pixel (12 MB for 12 MP)
     const stack   = [];                     // DFS stack (grows on demand)
 
+    // Pre-compute opacity blend factors once (avoids repeated slider reads in the hot loop)
+    const fillA  = Number(opacityRange.value) / 100;
+    const fillIA = 1 - fillA;
+    const fullOpacity = fillA >= 1;
+
     const startPx = startY * W + startX;
     stack.push(startPx);
     visited[startPx] = 1;
@@ -544,11 +562,18 @@ function floodFill(startX, startY) {
         const db = data[di + 2] - seedB;
         if (Math.sqrt(dr * dr + dg * dg + db * db) > tol) continue;
 
-        // Paint pixel
-        data[di]     = fillR;
-        data[di + 1] = fillG;
-        data[di + 2] = fillB;
-        data[di + 3] = 255;
+        // Paint pixel — blend with original if opacity < 100 %
+        if (fullOpacity) {
+            data[di]     = fillR;
+            data[di + 1] = fillG;
+            data[di + 2] = fillB;
+            data[di + 3] = 255;
+        } else {
+            data[di]     = Math.round(fillR * fillA + data[di]     * fillIA);
+            data[di + 1] = Math.round(fillG * fillA + data[di + 1] * fillIA);
+            data[di + 2] = Math.round(fillB * fillA + data[di + 2] * fillIA);
+            data[di + 3] = Math.round(255   * fillA + data[di + 3] * fillIA);
+        }
 
         const x = pos % W;
         const y = (pos / W) | 0;
@@ -573,6 +598,7 @@ function brushRadiusPx() {
 
 function drawBrush(x, y) {
     const r = brushRadiusPx();
+    ctx.globalAlpha = Number(opacityRange.value) / 100;
     ctx.fillStyle   = colorPicker.value;
     ctx.strokeStyle = colorPicker.value;
     ctx.lineCap     = 'round';
@@ -589,6 +615,7 @@ function drawBrush(x, y) {
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
     }
+    ctx.globalAlpha = 1;
     lastPos = { x, y };
 }
 
@@ -683,7 +710,7 @@ function drawPendingShape() {
         const { cx, cy, rx, ry } = pendingShape;
         overlayCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     }
-    overlayCtx.fillStyle = `rgba(${r},${g},${b},0.35)`;
+    overlayCtx.fillStyle = `rgba(${r},${g},${b},${Math.min(0.85, Number(opacityRange.value) / 100 * 0.85).toFixed(2)})`;
     overlayCtx.fill();
     overlayCtx.stroke();
     overlayCtx.restore();
@@ -709,6 +736,7 @@ function drawPendingShape() {
 function applyPendingShape() {
     if (!pendingShape) return;
     saveState();
+    ctx.globalAlpha = Number(opacityRange.value) / 100;
     ctx.fillStyle = pendingShape.color;
     ctx.beginPath();
     if (pendingShape.type === 'polygon') {
@@ -720,6 +748,7 @@ function applyPendingShape() {
         ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     }
     ctx.fill();
+    ctx.globalAlpha = 1;
     cancelPendingShape();
 }
 
@@ -1214,8 +1243,12 @@ btnUndo.addEventListener('click',     undo);
 btnRedo.addEventListener('click',     redo);
 btnDownload.addEventListener('click', download);
 
-tolRange.addEventListener('input',  () => { tolOut.textContent  = tolRange.value; });
-sizeRange.addEventListener('input', () => { sizeOut.textContent = sizeRange.value; });
+tolRange.addEventListener('input',  () => { tolOut.textContent     = tolRange.value; });
+sizeRange.addEventListener('input', () => { sizeOut.textContent    = sizeRange.value; });
+opacityRange.addEventListener('input', () => {
+    opacityOut.textContent = opacityRange.value;
+    if (pendingShape) drawPendingShape();  // live-preview opacity change on pending shape
+});
 
 /* ── Keyboard shortcuts ───────────────────────────────────────── */
 document.addEventListener('keydown', e => {
