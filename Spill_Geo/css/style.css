@@ -755,6 +755,125 @@ body {
   z-index: 11;
 }
 
+/* ── FILL THE MAP SCREEN ── */
+#screen-fillmap {
+  overflow: hidden;
+}
+
+#fillmap-map {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.fillmap-panel {
+  text-align: center;
+}
+
+.fillmap-target {
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  color: var(--accent);
+  margin: 6px 0 12px !important;
+}
+
+.fillmap-progress-bar {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.fillmap-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--success);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.fillmap-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.fillmap-mistakes {
+  color: var(--error);
+}
+
+.fillmap-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 10, 20, 0.55);
+  pointer-events: auto;
+}
+
+.fillmap-dialog.visible {
+  display: flex;
+  animation: fadeIn 0.2s ease;
+}
+
+.fillmap-dialog-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.fillmap-dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--error-dim);
+  color: var(--error);
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+}
+
+.fillmap-complete-icon {
+  font-size: 2.4rem;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.fillmap-complete-title {
+  margin-bottom: 8px;
+}
+
+.fillmap-dialog-text,
+.fillmap-complete-stats {
+  color: var(--text);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.fillmap-dialog-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.fillmap-dialog-btns .btn-primary,
+.fillmap-dialog-btns .btn-secondary {
+  flex: 1;
+}
+
 /* ── RESULTS SCREEN ── */
 .results-hero {
   text-align: center;

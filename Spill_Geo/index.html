@@ -33,6 +33,11 @@
         <span class="mode-name">United States</span>
         <span class="mode-desc">States, capitals &amp; major cities</span>
       </button>
+      <button class="mode-btn" id="btn-mode-fillmap" onclick="FillMap.openSetup()">
+        <span class="mode-flag">🗺️</span>
+        <span class="mode-name">Fill the Map</span>
+        <span class="mode-desc">Colour every country or state until the map is full</span>
+      </button>
       <button class="mode-btn" id="btn-mode-study" onclick="Study.open()">
         <span class="mode-flag">📚</span>
         <span class="mode-name">Study</span>
@@ -182,6 +187,90 @@
   <div id="leaflet-map"></div>
 </div>
 
+<!-- ═══════════════════════════════════ SCREEN: FILL THE MAP — SETUP ═══════════════════════════════════ -->
+<div id="screen-fillmap-setup" class="screen">
+  <div class="screen-content">
+    <div class="screen-header">
+      <button class="back-btn" onclick="App.showScreen('screen-start')">← Back</button>
+      <h2>🗺️ Fill the Map</h2>
+    </div>
+
+    <p class="settings-hint" style="margin-bottom:20px">
+      Colour in every region one by one. Correct picks turn green and stay filled;
+      a wrong pick reveals the target in red. Keep going until the whole map is full.
+    </p>
+
+    <div class="settings-section">
+      <h3 class="settings-label">What to fill</h3>
+      <div class="pill-group" id="fm-scope-group">
+        <button class="pill-btn active" data-scope="world"     onclick="FillMap.setScope('world')">🌍 World countries</button>
+        <button class="pill-btn"        data-scope="continent" onclick="FillMap.setScope('continent')">🧭 One continent</button>
+        <button class="pill-btn"        data-scope="usa"       onclick="FillMap.setScope('usa')">🇺🇸 US states</button>
+      </div>
+    </div>
+
+    <div class="settings-section" id="fm-continent-section" style="display:none">
+      <h3 class="settings-label">Continent</h3>
+      <div class="pill-group" id="fm-continent-group">
+        <button class="pill-btn active" data-continent="Europe"        onclick="FillMap.setContinent('Europe')">Europe</button>
+        <button class="pill-btn"        data-continent="Asia"          onclick="FillMap.setContinent('Asia')">Asia</button>
+        <button class="pill-btn"        data-continent="Africa"        onclick="FillMap.setContinent('Africa')">Africa</button>
+        <button class="pill-btn"        data-continent="North America" onclick="FillMap.setContinent('North America')">N. America</button>
+        <button class="pill-btn"        data-continent="South America" onclick="FillMap.setContinent('South America')">S. America</button>
+        <button class="pill-btn"        data-continent="Oceania"       onclick="FillMap.setContinent('Oceania')">Oceania</button>
+      </div>
+    </div>
+
+    <button class="btn-primary btn-large btn-start" id="fm-start-btn" onclick="FillMap.startFromSetup()">
+      Start →
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN: FILL THE MAP — PLAY ═══════════════════════════════════ -->
+<div id="screen-fillmap" class="screen">
+  <div class="map-ui-layer">
+    <div class="map-question-card fillmap-panel">
+      <span class="question-category-tag">🗺️ Fill the Map — find:</span>
+      <p class="fillmap-target" id="fillmap-target">—</p>
+      <div class="fillmap-progress-bar"><div class="fillmap-progress-fill" id="fillmap-progress-fill"></div></div>
+      <div class="fillmap-stats">
+        <span id="fillmap-progress">0 / 0</span>
+        <span class="fillmap-mistakes" id="fillmap-mistakes">✗ 0</span>
+      </div>
+    </div>
+
+    <!-- Wrong-answer prompt -->
+    <div class="fillmap-dialog" id="fillmap-dialog">
+      <div class="fillmap-dialog-box">
+        <span class="feedback-icon fillmap-dialog-icon">✗</span>
+        <p class="fillmap-dialog-text" id="fillmap-dialog-text"></p>
+        <div class="fillmap-dialog-btns">
+          <button class="btn-secondary" onclick="FillMap.restart()">↻ Start Over</button>
+          <button class="btn-primary" onclick="FillMap.continueGame()">Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completion overlay -->
+    <div class="fillmap-dialog" id="fillmap-complete">
+      <div class="fillmap-dialog-box">
+        <span class="feedback-icon fillmap-complete-icon">🏁</span>
+        <h3 class="fillmap-complete-title">Map complete!</h3>
+        <p class="fillmap-complete-stats" id="fillmap-complete-stats"></p>
+        <div class="fillmap-dialog-btns">
+          <button class="btn-secondary" onclick="App.showScreen('screen-start')">🏠 Home</button>
+          <button class="btn-primary" onclick="FillMap.openSetup()">Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-score-pill" id="fillmap-score-pill">0 filled</div>
+    <button class="quit-btn quit-btn-map" onclick="FillMap.quit()" title="Quit game">✕ Quit</button>
+  </div>
+  <div id="fillmap-map"></div>
+</div>
+
 <!-- ═══════════════════════════════════ SCREEN: RESULTS ═══════════════════════════════════ -->
 <div id="screen-results" class="screen">
   <div class="screen-content">
@@ -297,6 +386,7 @@
 <script src="js/questions.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/map-module.js"></script>
+<script src="js/fillmap.js"></script>
 <script src="js/app.js"></script>
 <script src="js/study.js"></script>
 </body>
