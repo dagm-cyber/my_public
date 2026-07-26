@@ -68,6 +68,7 @@ const FillMap = (() => {
     mistakes:   0,
     finished:   false,
     dialogOpen: false,
+    dialogShown: false,   // dialog is shown only on the first wrong pick
     pendingView: null,
   };
 
@@ -246,11 +247,12 @@ const FillMap = (() => {
 
     S.scope      = scope;
     S.continent  = continent || null;
-    S.doneCount  = 0;
-    S.mistakes   = 0;
-    S.finished   = false;
-    S.dialogOpen = false;
-    S.current    = null;
+    S.doneCount   = 0;
+    S.mistakes    = 0;
+    S.finished    = false;
+    S.dialogOpen  = false;
+    S.dialogShown = false;
+    S.current     = null;
 
     _el('fillmap-dialog').classList.remove('visible');
     _el('fillmap-complete').classList.remove('visible');
@@ -336,7 +338,14 @@ const FillMap = (() => {
       S.mistakes++;
       S.doneCount++;
       _updateStats();
-      _openDialog(_layerName(layer));
+      if (!S.dialogShown) {
+        // Ask to continue / restart only the very first time a pick is wrong
+        S.dialogShown = true;
+        _openDialog(_layerName(layer));
+      } else {
+        // Later mistakes: just reveal in red and move on automatically
+        _nextTarget();
+      }
     }
   }
 
