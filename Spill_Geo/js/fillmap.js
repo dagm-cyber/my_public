@@ -24,7 +24,9 @@ const FillMap = (() => {
   const STYLE_DEFAULT = { fillColor: '#1a3a5c', fillOpacity: 0.45, color: '#3b6fa0', weight: 1 };
   const STYLE_HOVER   = { fillColor: '#2a5280', fillOpacity: 0.70, color: '#5aaff0', weight: 1.5 };
   const STYLE_CORRECT = { fillColor: '#16a34a', fillOpacity: 0.9,  color: '#22c55e', weight: 1.5 };
-  const STYLE_WRONG   = { fillColor: '#dc2626', fillOpacity: 0.9,  color: '#ef4444', weight: 1.5 };
+  // Older mistakes: muted dark red. Newest mistake: bright red with a thick glowing border.
+  const STYLE_WRONG        = { fillColor: '#7f1d1d', fillOpacity: 0.7,  color: '#991b1b', weight: 1 };
+  const STYLE_WRONG_LATEST = { fillColor: '#ef4444', fillOpacity: 0.95, color: '#fecaca', weight: 3 };
 
   // Natural Earth country names that differ from our data set → ISO2 code
   const NAME_ALIASES = {
@@ -69,6 +71,7 @@ const FillMap = (() => {
     finished:   false,
     dialogOpen: false,
     dialogShown: false,   // dialog is shown only on the first wrong pick
+    lastWrongLayer: null, // most recent wrong region (kept brightly highlighted)
     pendingView: null,
   };
 
@@ -252,6 +255,7 @@ const FillMap = (() => {
     S.finished    = false;
     S.dialogOpen  = false;
     S.dialogShown = false;
+    S.lastWrongLayer = null;
     S.current     = null;
 
     _el('fillmap-dialog').classList.remove('visible');
@@ -332,8 +336,12 @@ const FillMap = (() => {
       // Wrong → reveal the target in red, then ask continue / restart
       const targetLayer = S.layerByKey.get(S.current.key);
       if (targetLayer) {
+        // Dim the previous newest mistake so only the latest one stands out
+        if (S.lastWrongLayer) S.lastWrongLayer.setStyle(STYLE_WRONG);
         targetLayer.__fmDone = true;
-        targetLayer.setStyle(STYLE_WRONG);
+        targetLayer.setStyle(STYLE_WRONG_LATEST);
+        targetLayer.bringToFront();
+        S.lastWrongLayer = targetLayer;
       }
       S.mistakes++;
       S.doneCount++;
