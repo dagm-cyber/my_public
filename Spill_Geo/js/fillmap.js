@@ -54,7 +54,7 @@ const FillMap = (() => {
   let usLayer    = null;
 
   // ── Setup screen state ───────────────────────────────────
-  const setup = { scope: 'world', continent: 'Europe', langs: ['en'] };
+  const setup = { scope: 'world', continent: 'Europe', langs: ['en'], showLabels: false };
 
   // ── Live game state ──────────────────────────────────────
   const S = {
@@ -75,6 +75,7 @@ const FillMap = (() => {
     missed:     [],       // targets picked wrong this round { key, name }
     pendingView: null,
     langs:      ['en'],   // active display languages for names
+    showLabels: false,    // draw region names on the map (practice mode)
   };
 
   const _el = id => document.getElementById(id);
@@ -113,6 +114,7 @@ const FillMap = (() => {
 
   function setScope(scope)         { setup.scope = scope; _syncSetup(); }
   function setContinent(continent) { setup.continent = continent; _syncSetup(); }
+  function setShowLabels(on)       { setup.showLabels = !!on; }
 
   function _syncSetup() {
     document.querySelectorAll('#fm-scope-group .pill-btn').forEach(b =>
@@ -121,6 +123,8 @@ const FillMap = (() => {
       b.classList.toggle('active', b.dataset.continent === setup.continent));
     const contSection = _el('fm-continent-section');
     if (contSection) contSection.style.display = setup.scope === 'continent' ? '' : 'none';
+    const labelsCb = _el('fm-show-labels');
+    if (labelsCb) labelsCb.checked = setup.showLabels;
   }
 
   function startFromSetup() {
@@ -204,6 +208,7 @@ const FillMap = (() => {
       if (continent && country.continent !== continent) return;
       layer.__fmKey = key;
       S.layerByKey.set(key, layer);
+      layer.__fmLabel = country.name;
       targets.push({ key, name: country.name });
     });
     S.layer = worldLayer;
@@ -234,6 +239,7 @@ const FillMap = (() => {
       layer.__fmKey = validNames.has(nm) ? nm : null;
       if (!layer.__fmKey) return;
       S.layerByKey.set(nm, layer);
+      layer.__fmLabel = nm;
       targets.push({ key: nm, name: nm });
     });
     S.layer = usLayer;
@@ -258,6 +264,7 @@ const FillMap = (() => {
     S.scope      = scope;
     S.continent  = continent || null;
     S.langs      = (setup.langs && setup.langs.length) ? setup.langs : ['en'];
+    S.showLabels = !!setup.showLabels;
 
     let targets;
     if (scope === 'usa') {
@@ -299,6 +306,7 @@ const FillMap = (() => {
 
     // Reset styles & "done" flags on the active layer
     S.layer.eachLayer(l => { l.__fmDone = false; l.setStyle(STYLE_DEFAULT); });
+    _applyLabels();
 
     S.allTargets = targets;
     S.total      = targets.length;
@@ -310,6 +318,19 @@ const FillMap = (() => {
       map.invalidateSize();
       _applyPendingView();
       _nextTarget();
+    });
+  }
+
+  /** Draw or remove permanent name labels on the active layer's regions. */
+  function _applyLabels() {
+    if (!S.layer) return;
+    S.layer.eachLayer(l => {
+      if (l.getTooltip && l.getTooltip()) l.unbindTooltip();
+      if (S.showLabels && l.__fmKey && l.__fmLabel) {
+        l.bindTooltip(Lang.name(l.__fmLabel, S.langs), {
+          permanent: true, direction: 'center', className: 'fillmap-label', opacity: 1,
+        });
+      }
     });
   }
 
@@ -432,7 +453,7 @@ const FillMap = (() => {
   }
 
   return {
-    openSetup, setScope, setContinent, startFromSetup,
+    openSetup, setScope, setContinent, setShowLabels, startFromSetup,
     start, restart, continueGame, practiceMissed, quit,
   };
 })();

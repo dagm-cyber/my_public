@@ -237,6 +237,15 @@
       <p class="settings-hint">Tick both to show English first, then Norwegian.</p>
     </div>
 
+    <div class="settings-section">
+      <h3 class="settings-label">Practice help</h3>
+      <label class="lang-check">
+        <input type="checkbox" id="fm-show-labels" onchange="FillMap.setShowLabels(this.checked)">
+        <span> 🏷️ Show names on the map</span>
+      </label>
+      <p class="settings-hint">Handy for practising — every region is labelled with its name.</p>
+    </div>
+
     <button class="btn-primary btn-large btn-start" id="fm-start-btn" onclick="FillMap.startFromSetup()">
       Start →
     </button>
