@@ -321,16 +321,20 @@ const FillMap = (() => {
     });
   }
 
-  /** Draw or remove permanent name labels on the active layer's regions. */
+  /** Clear all name labels — used when a round starts or restarts. */
   function _applyLabels() {
     if (!S.layer) return;
     S.layer.eachLayer(l => {
       if (l.getTooltip && l.getTooltip()) l.unbindTooltip();
-      if (S.showLabels && l.__fmKey && l.__fmLabel) {
-        l.bindTooltip(Lang.name(l.__fmLabel, S.langs), {
-          permanent: true, direction: 'center', className: 'fillmap-label', opacity: 1,
-        });
-      }
+    });
+  }
+
+  /** Reveal the name label on a single region once it has been resolved. */
+  function _labelLayer(layer) {
+    if (!S.showLabels || !layer || !layer.__fmKey || !layer.__fmLabel) return;
+    if (layer.getTooltip && layer.getTooltip()) return;
+    layer.bindTooltip(Lang.name(layer.__fmLabel, S.langs), {
+      permanent: true, direction: 'center', className: 'fillmap-label', opacity: 1,
     });
   }
 
@@ -375,6 +379,7 @@ const FillMap = (() => {
       // Correct → colour green permanently
       layer.__fmDone = true;
       layer.setStyle(STYLE_CORRECT);
+      _labelLayer(layer);
       S.doneCount++;
       _updateStats();
       _nextTarget();
@@ -387,6 +392,7 @@ const FillMap = (() => {
         targetLayer.__fmDone = true;
         targetLayer.setStyle(STYLE_WRONG_LATEST);
         targetLayer.bringToFront();
+        _labelLayer(targetLayer);
         S.lastWrongLayer = targetLayer;
       }
       S.missed.push({ key: S.current.key, name: S.current.name });
