@@ -45,6 +45,11 @@ class QuizSession {
       const correct  = norm(question.correctAnswer);
       const answer   = norm(userAnswer);
       const aliases  = (question.aliases || []).map(norm);
+      // Also accept the Norwegian form of the answer when available.
+      if (typeof Lang !== 'undefined') {
+        const no = Lang.toNo(question.correctAnswer);
+        if (no) aliases.push(norm(no));
+      }
       return answer === correct || aliases.includes(answer);
     }
     // mcq, mcq-image, map

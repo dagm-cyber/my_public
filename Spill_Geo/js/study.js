@@ -28,6 +28,7 @@ const Study = (() => {
     App.showScreen('screen-study');
     _showLoading(true);
     try {
+      await Lang.load();
       _data = await Data.load(_mode);
     } catch (e) {
       _showLoading(false);
@@ -342,7 +343,9 @@ const Study = (() => {
       if (_browseFilter !== 'all') list = list.filter(c => c.continent === _browseFilter);
       if (q) list = list.filter(c =>
         c.name.toLowerCase().includes(q) ||
-        (c.capital || '').toLowerCase().includes(q)
+        (c.capital || '').toLowerCase().includes(q) ||
+        (Lang.toNo(c.name) || '').toLowerCase().includes(q) ||
+        (Lang.toNo(c.capital) || '').toLowerCase().includes(q)
       );
       list.sort((a, b) => a.name.localeCompare(b.name));
       grid.innerHTML = list.map(c => `
@@ -353,10 +356,10 @@ const Study = (() => {
                  onerror="this.style.display='none'">
           </div>
           <div class="study-card-body">
-            <div class="study-card-name">${_esc(c.name)}</div>
+            <div class="study-card-name">${_esc(_L(c.name))}</div>
             <div class="study-card-meta">
-              ${c.capital  ? `<span>🏙️ ${_esc(c.capital)}</span>`  : ''}
-              <span>🌍 ${_esc(c.continent)}</span>
+              ${c.capital  ? `<span>🏙️ ${_esc(_L(c.capital))}</span>`  : ''}
+              <span>🌍 ${_esc(_L(c.continent))}</span>
               ${c.currency ? `<span>💰 ${_esc(c.currency)}</span>` : ''}
               ${c.language ? `<span>🗣️ ${_esc(c.language)}</span>` : ''}
             </div>
@@ -370,16 +373,17 @@ const Study = (() => {
       if (q) list = list.filter(s =>
         s.name.toLowerCase().includes(q) ||
         s.capital.toLowerCase().includes(q) ||
-        s.abbr.toLowerCase().includes(q)
+        s.abbr.toLowerCase().includes(q) ||
+        (Lang.toNo(s.name) || '').toLowerCase().includes(q)
       );
       list.sort((a, b) => a.name.localeCompare(b.name));
       grid.innerHTML = list.map(s => `
         <div class="study-card">
           <div class="study-card-abbr">${_esc(s.abbr)}</div>
           <div class="study-card-body">
-            <div class="study-card-name">${_esc(s.name)}</div>
+            <div class="study-card-name">${_esc(_L(s.name))}</div>
             <div class="study-card-meta">
-              <span>🏛️ ${_esc(s.capital)}</span>
+              <span>🏛️ ${_esc(_L(s.capital))}</span>
               <span>📍 ${_esc(s.region)}</span>
             </div>
           </div>
@@ -517,8 +521,8 @@ const Study = (() => {
       `;
     } else {
       el.innerHTML = `
-        <div class="flash-main-text">${_esc(data.main)}</div>
-        ${data.sub ? `<div class="flash-sub-text">${_esc(data.sub)}</div>` : ''}
+        <div class="flash-main-text">${_esc(_L(data.main))}</div>
+        ${data.sub ? `<div class="flash-sub-text">${_esc(_L(data.sub))}</div>` : ''}
       `;
     }
   }
@@ -575,12 +579,12 @@ const Study = (() => {
               ? `<img src="https://flagcdn.com/32x24/${iso2}.png" style="border-radius:2px;vertical-align:middle;margin-bottom:4px"><br>`
               : '';
             const html = country
-              ? `${flag}<strong>${_esc(name)}</strong><br>
-                 🏙️ ${_esc(country.capital || '—')}<br>
-                 🌍 ${_esc(country.continent)}
+              ? `${flag}<strong>${_esc(_L(name))}</strong><br>
+                 🏙️ ${_esc(country.capital ? _L(country.capital) : '—')}<br>
+                 🌍 ${_esc(_L(country.continent))}
                  ${country.currency ? `<br>💰 ${_esc(country.currency)}` : ''}
                  ${country.language ? `<br>🗣️ ${_esc(country.language)}` : ''}`
-              : `<strong>${_esc(name)}</strong>`;
+              : `<strong>${_esc(_L(name))}</strong>`;
             layer.bindPopup(html, { className: 'study-dark-popup', maxWidth: 220 }).openPopup();
           });
         },
@@ -605,10 +609,10 @@ const Study = (() => {
           layer.on('mouseout',  () => layer.setStyle(STYLE_BASE));
           layer.on('click', () => {
             const html = state
-              ? `<strong>${_esc(name)}</strong> <span style="color:#38bdf8">(${_esc(state.abbr)})</span><br>
-                 🏛️ ${_esc(state.capital)}<br>
+              ? `<strong>${_esc(_L(name))}</strong> <span style="color:#38bdf8">(${_esc(state.abbr)})</span><br>
+                 🏛️ ${_esc(_L(state.capital))}<br>
                  📍 ${_esc(state.region)}`
-              : `<strong>${_esc(name)}</strong>`;
+              : `<strong>${_esc(_L(name))}</strong>`;
             layer.bindPopup(html, { className: 'study-dark-popup', maxWidth: 200 }).openPopup();
           });
         },
@@ -635,6 +639,11 @@ const Study = (() => {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // Localize an English name for display using the global language preference.
+  function _L(name) {
+    return (typeof Lang !== 'undefined') ? Lang.name(name, Lang.getGlobal()) : name;
   }
 
   return {

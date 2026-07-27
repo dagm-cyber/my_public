@@ -17,6 +17,10 @@
       <h1 class="hero-title">GeoQuiz</h1>
       <p class="hero-subtitle">How well do you know our planet?</p>
     </div>
+    <div class="lang-row">
+      <span class="lang-row-label">Names shown in:</span>
+      <div class="lang-check-group" id="global-lang-group"></div>
+    </div>
     <div class="mode-buttons">
       <button class="mode-btn" id="btn-mode-norway" onclick="App.selectMode('norway')">
         <span class="mode-flag">🇳🇴</span>
@@ -61,6 +65,12 @@
         <button class="link-btn" id="cat-toggle-all" onclick="App.toggleAllCategories()">Deselect All</button>
       </div>
       <div id="categories-container" class="categories-grid"></div>
+    </div>
+
+    <div class="settings-section" id="lang-section" style="display:none">
+      <h3 class="settings-label">Language of names</h3>
+      <div class="lang-check-group" id="lang-group"></div>
+      <p class="settings-hint">Tick both to show English first, then Norwegian.</p>
     </div>
 
     <div class="settings-section">
@@ -219,6 +229,12 @@
         <button class="pill-btn"        data-continent="South America" onclick="FillMap.setContinent('South America')">S. America</button>
         <button class="pill-btn"        data-continent="Oceania"       onclick="FillMap.setContinent('Oceania')">Oceania</button>
       </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 class="settings-label">Language of names</h3>
+      <div class="lang-check-group" id="fm-lang-group"></div>
+      <p class="settings-hint">Tick both to show English first, then Norwegian.</p>
     </div>
 
     <button class="btn-primary btn-large btn-start" id="fm-start-btn" onclick="FillMap.startFromSetup()">
@@ -385,6 +401,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="js/lang.js"></script>
 <script src="js/data.js"></script>
 <script src="js/questions.js"></script>
 <script src="js/quiz.js"></script>

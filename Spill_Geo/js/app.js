@@ -13,6 +13,7 @@ const App = (() => {
     timerSeconds:  0,       // 0 = off; 15 or 30
     data:          null,
     session:       null,
+    langs:         ['en'],  // active display languages, e.g. ['en'] or ['en','no']
   };
 
   // ── Category definitions per mode ───────────────────────
@@ -63,6 +64,11 @@ const App = (() => {
     state.mode = mode;
     state.categories.clear();
 
+    // Ensure translations are ready and default this game's languages to the
+    // global preference.
+    await Lang.load();
+    state.langs = Lang.getGlobal();
+
     // Show loading state on start button
     const startBtn = document.getElementById('btn-start');
     if (startBtn) startBtn.textContent = 'Loading…';
@@ -96,6 +102,13 @@ const App = (() => {
     if (contSection) contSection.style.display = mode === 'world' ? '' : 'none';
     _syncContinentPills();
     _syncTimerPills();
+
+    // Language selector: only meaningful for World / USA (Norway names stay Norwegian)
+    const langSection = document.getElementById('lang-section');
+    if (langSection) langSection.style.display = (mode === 'world' || mode === 'usa') ? '' : 'none';
+    Lang.renderChecks(document.getElementById('lang-group'), state.langs, next => {
+      state.langs = next;
+    });
 
     if (startBtn) startBtn.textContent = 'Start Quiz →';
 
@@ -271,7 +284,7 @@ const App = (() => {
 
     document.querySelectorAll('.option-btn').forEach(btn => {
       btn.disabled = true;
-      if (btn.textContent === q.correctAnswer) btn.classList.add('correct');
+      if (btn.dataset.value === q.correctAnswer) btn.classList.add('correct');
     });
     const inp = _el('text-answer-input');  if (inp)    inp.disabled    = true;
     const sub = _el('text-answer-submit'); if (sub)    sub.disabled    = true;
@@ -352,7 +365,7 @@ const App = (() => {
     const _hintEl = _el('feedback-hint'); if (_hintEl) _hintEl.innerHTML = '';
 
     _el('question-category-tag').textContent = q.category;
-    _el('question-text').textContent         = q.text;
+    _el('question-text').textContent         = _LT(q.text);
 
     if (q.type === 'mcq-image' && q.imageUrl) {
       _el('question-image').src = q.imageUrl;
@@ -382,7 +395,8 @@ const App = (() => {
     for (const opt of options) {
       const btn = document.createElement('button');
       btn.className   = 'option-btn';
-      btn.textContent = opt;
+      btn.dataset.value = opt;
+      btn.textContent = _L(opt);
       btn.addEventListener('click', () => _handleMCQAnswer(opt));
       grid.appendChild(btn);
     }
@@ -400,8 +414,8 @@ const App = (() => {
     // Lock all buttons
     document.querySelectorAll('.option-btn').forEach(btn => {
       btn.disabled = true;
-      if (btn.textContent === q.correctAnswer) btn.classList.add('correct');
-      else if (btn.textContent === chosen && !correct) btn.classList.add('wrong');
+      if (btn.dataset.value === q.correctAnswer) btn.classList.add('correct');
+      else if (btn.dataset.value === chosen && !correct) btn.classList.add('wrong');
     });
 
     _showFeedback(correct, q.correctAnswer, q);
@@ -437,7 +451,7 @@ const App = (() => {
     _el('feedback-icon').textContent = correct ? '✓' : (timeout ? '⏱' : '✗');
     _el('feedback-text').textContent = correct
       ? 'Correct!'
-      : `${timeout ? 'Time up!' : 'Wrong.'} The answer is: ${correctAnswer}`;
+      : `${timeout ? 'Time up!' : 'Wrong.'} The answer is: ${_L(correctAnswer)}`;
 
     const hintEl = _el('feedback-hint');
     if (hintEl) hintEl.innerHTML = (!correct && question) ? _getAnswerHint(question) : '';
@@ -457,17 +471,17 @@ const App = (() => {
             (x.currency && x.currency === ans) || (x.language && x.language === ans)
           );
           if (c) return `<img src="https://flagcdn.com/w40/${c.iso2}.png" alt="" class="feedback-flag"> `
-            + `${_escHtml(c.name)} · ${_escHtml(c.continent)}`;
+            + `${_escHtml(_L(c.name))} · ${_escHtml(_L(c.continent))}`;
         }
         if (cat === 'Mountains') {
           const m = (state.data.geography.mountains || []).find(x => x.name === ans);
-          if (m) return `${m.height.toLocaleString()} m · ${_escHtml(m.country)}`;
+          if (m) return `${m.height.toLocaleString()} m · ${_escHtml(_L(m.country))}`;
           const r = (state.data.geography.rivers || []).find(x => x.name === ans);
-          if (r) return `${r.length.toLocaleString()} km · ${_escHtml(r.continent)}`;
+          if (r) return `${r.length.toLocaleString()} km · ${_escHtml(_L(r.continent))}`;
         }
         if (cat === 'Lakes') {
           const l = (state.data.geography.lakes || []).find(x => x.name === ans);
-          if (l) return `${_escHtml(l.continent)} · ${l.area.toLocaleString()} km²`;
+          if (l) return `${_escHtml(_L(l.continent))} · ${l.area.toLocaleString()} km²`;
         }
       }
       if (state.mode === 'norway') {
@@ -495,12 +509,12 @@ const App = (() => {
       if (state.mode === 'usa') {
         if (cat === 'States') {
           const st = (state.data.states || []).find(x => x.name === ans || x.capital === ans);
-          if (st) return `${_escHtml(st.name)} (${_escHtml(st.abbr)}) · ${_escHtml(st.region)}`;
+          if (st) return `${_escHtml(_L(st.name))} (${_escHtml(st.abbr)}) · ${_escHtml(st.region)}`;
         }
         if (cat === 'Cities') {
           // correctAnswer is a state name for "In which state is [City]?" questions
           const st = (state.data.states || []).find(x => x.name === ans);
-          if (st) return `${_escHtml(st.name)} (${_escHtml(st.abbr)})`;
+          if (st) return `${_escHtml(_L(st.name))} (${_escHtml(st.abbr)})`;
         }
       }
     } catch (e) { console.warn('Hint error:', e); }
@@ -510,7 +524,7 @@ const App = (() => {
   // ── Map questions ─────────────────────────────────────────
 
   function _renderMapQuestion(q) {
-    _el('map-question-text').textContent = q.text;
+    _el('map-question-text').textContent = _LT(q.text);
     _el('map-feedback-toast').classList.remove('visible', 'correct-fb', 'wrong-fb');
     _el('map-score-pill').textContent = `${state.session.score} pts`;
 
@@ -527,8 +541,7 @@ const App = (() => {
 
   function _renderUSAMapQuestion(q) {
     _el('map-question-text').textContent = q.text;
-    const capSec = _el('map-capital-section');
-    if (capSec) capSec.style.display = 'none';
+    const capSec = _el('map-capital-section');    if (capSec) capSec.style.display = 'none';
     _el('map-feedback-toast').classList.remove('visible', 'correct-fb', 'wrong-fb');
     _el('map-score-pill').textContent = `${state.session.score} pts`;
 
@@ -553,8 +566,8 @@ const App = (() => {
           toast.className = 'map-feedback-toast visible wrong-fb';
           _el('map-feedback-icon').textContent = '\u2717';
           _el('map-feedback-text').textContent = clickedName
-            ? `Wrong \u2014 you clicked ${clickedName}. The correct state was ${q.correctStateName}.`
-            : `Wrong. The correct state was ${q.correctStateName}.`;
+            ? `Wrong \u2014 you clicked ${_L(clickedName)}. The correct state was ${_L(q.correctStateName)}.`
+            : `Wrong. The correct state was ${_L(q.correctStateName)}.`;
           _el('map-score-pill').textContent = `${state.session.score} pts`;
         }
       });
@@ -564,7 +577,7 @@ const App = (() => {
   function _showUSMapCapitalPhase(q) {
     _el('map-question-text').textContent = '\u2713 Found it! Now answer:';
 
-    _el('map-capital-prompt').textContent = q.capitalText;
+    _el('map-capital-prompt').textContent = _LT(q.capitalText);
 
     const grid = _el('map-capital-options');
     grid.innerHTML = '';
@@ -572,13 +585,14 @@ const App = (() => {
     for (const opt of q.capitalOptions) {
       const btn = document.createElement('button');
       btn.className   = 'option-btn';
-      btn.textContent = opt;
+      btn.dataset.value = opt;
+      btn.textContent = _L(opt);
       btn.addEventListener('click', () => {
         // Lock all buttons
         grid.querySelectorAll('.option-btn').forEach(b => {
           b.disabled = true;
-          if (b.textContent === q.correctAnswer) b.classList.add('correct');
-          else if (b.textContent === opt && opt !== q.correctAnswer) b.classList.add('wrong');
+          if (b.dataset.value === q.correctAnswer) b.classList.add('correct');
+          else if (b.dataset.value === opt && opt !== q.correctAnswer) b.classList.add('wrong');
         });
 
         const correct = opt === q.correctAnswer;
@@ -590,8 +604,8 @@ const App = (() => {
         toast.className = `map-feedback-toast visible ${correct ? 'correct-fb' : 'wrong-fb'}`;
         _el('map-feedback-icon').textContent = correct ? '\u2713' : '\u2717';
         _el('map-feedback-text').textContent = correct
-          ? `Correct \u2014 the capital is ${q.correctAnswer}!`
-          : `Wrong. The capital is ${q.correctAnswer}.`;
+          ? `Correct \u2014 the capital is ${_L(q.correctAnswer)}!`
+          : `Wrong. The capital is ${_L(q.correctAnswer)}.`;
       });
       grid.appendChild(btn);
     }
@@ -604,8 +618,8 @@ const App = (() => {
     toast.className = 'map-feedback-toast visible ' + (correct ? 'correct-fb' : 'wrong-fb');
     _el('map-feedback-icon').textContent = correct ? '✓' : '✗';
     _el('map-feedback-text').textContent = correct
-      ? `Correct! That is ${targetName}.`
-      : `Wrong. You clicked ${clickedName}. The correct answer is ${targetName}.`;
+      ? `Correct! That is ${_L(targetName)}.`
+      : `Wrong. You clicked ${_L(clickedName)}. The correct answer is ${_L(targetName)}.`;
   }
 
   function advanceFromMap() {
@@ -693,9 +707,9 @@ const App = (() => {
       const item = document.createElement('div');
       item.className = 'missed-item';
       item.innerHTML = `
-        <div class="missed-q">${_escHtml(a.question.text)}</div>
+        <div class="missed-q">${_escHtml(_LT(a.question.text))}</div>
         <div class="missed-ua">Your answer: ${_escHtml(String(a.userAnswer))}</div>
-        <div class="missed-ca">Correct: ${_escHtml(a.question.correctAnswer)}</div>
+        <div class="missed-ca">Correct: ${_escHtml(_L(a.question.correctAnswer))}</div>
       `;
       list.appendChild(item);
     }
@@ -765,6 +779,16 @@ const App = (() => {
     return document.getElementById(id);
   }
 
+  // Localize a single English name for display in the active languages.
+  function _L(name) {
+    return (typeof Lang !== 'undefined') ? Lang.name(name, state.langs) : name;
+  }
+
+  // Localize the names embedded in a free-text string.
+  function _LT(text) {
+    return (typeof Lang !== 'undefined') ? Lang.dispText(text, state.langs) : text;
+  }
+
   function _escHtml(str) {
     return str
       .replace(/&/g, '&amp;')
@@ -789,6 +813,14 @@ const App = (() => {
 
   function init() {
     showScreen('screen-start');
+    // Wire up the global language checkboxes (does not require translations).
+    state.langs = Lang.getGlobal();
+    Lang.renderChecks(document.getElementById('global-lang-group'), Lang.getGlobal(), next => {
+      Lang.setGlobal(next);
+      state.langs = next;
+    });
+    // Load translations in the background.
+    Lang.load();
   }
 
   document.addEventListener('DOMContentLoaded', init);

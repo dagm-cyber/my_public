@@ -54,7 +54,7 @@ const FillMap = (() => {
   let usLayer    = null;
 
   // ── Setup screen state ───────────────────────────────────
-  const setup = { scope: 'world', continent: 'Europe' };
+  const setup = { scope: 'world', continent: 'Europe', langs: ['en'] };
 
   // ── Live game state ──────────────────────────────────────
   const S = {
@@ -74,6 +74,7 @@ const FillMap = (() => {
     lastWrongLayer: null, // most recent wrong region (kept brightly highlighted)
     missed:     [],       // targets picked wrong this round { key, name }
     pendingView: null,
+    langs:      ['en'],   // active display languages for names
   };
 
   const _el = id => document.getElementById(id);
@@ -103,6 +104,10 @@ const FillMap = (() => {
 
   function openSetup() {
     App.showScreen('screen-fillmap-setup');
+    Lang.load().then(() => {
+      setup.langs = Lang.getGlobal();
+      Lang.renderChecks(_el('fm-lang-group'), setup.langs, next => { setup.langs = next; });
+    });
     _syncSetup();
   }
 
@@ -248,9 +253,11 @@ const FillMap = (() => {
 
   async function start(scope, continent) {
     await _ensureMap();
+    await Lang.load();
 
     S.scope      = scope;
     S.continent  = continent || null;
+    S.langs      = (setup.langs && setup.langs.length) ? setup.langs : ['en'];
 
     let targets;
     if (scope === 'usa') {
@@ -331,7 +338,7 @@ const FillMap = (() => {
     _el('fillmap-dialog').classList.remove('visible');
     if (S.queue.length === 0) { _finish(); return; }
     S.current = S.queue.shift();
-    _el('fillmap-target').textContent = S.current.name;
+    _el('fillmap-target').textContent = Lang.name(S.current.name, S.langs);
   }
 
   function continueGame() {
@@ -379,8 +386,8 @@ const FillMap = (() => {
   function _openDialog(clickedName) {
     S.dialogOpen = true;
     _el('fillmap-dialog-text').innerHTML =
-      `You picked <b>${_escHtml(clickedName)}</b>. ` +
-      `<b>${_escHtml(S.current.name)}</b> is shown in <span style="color:var(--error)">red</span>.`;
+      `You picked <b>${_escHtml(Lang.name(clickedName, S.langs))}</b>. ` +
+      `<b>${_escHtml(Lang.name(S.current.name, S.langs))}</b> is shown in <span style="color:var(--error)">red</span>.`;
     _el('fillmap-dialog').classList.add('visible');
   }
 
