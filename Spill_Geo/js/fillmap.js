@@ -72,6 +72,7 @@ const FillMap = (() => {
     dialogOpen: false,
     dialogShown: false,   // dialog is shown only on the first wrong pick
     lastWrongLayer: null, // most recent wrong region (kept brightly highlighted)
+    missed:     [],       // targets picked wrong this round { key, name }
     pendingView: null,
   };
 
@@ -250,33 +251,44 @@ const FillMap = (() => {
 
     S.scope      = scope;
     S.continent  = continent || null;
-    S.doneCount   = 0;
-    S.mistakes    = 0;
-    S.finished    = false;
-    S.dialogOpen  = false;
-    S.dialogShown = false;
-    S.lastWrongLayer = null;
-    S.current     = null;
-
-    _el('fillmap-dialog').classList.remove('visible');
-    _el('fillmap-complete').classList.remove('visible');
 
     let targets;
     if (scope === 'usa') {
       targets = await _setupUSA();
       _removeLayer(worldLayer);
       if (!map.hasLayer(usLayer)) usLayer.addTo(map);
-      S.pendingView = { type: 'bounds', bounds: [[24, -125], [50, -66]] };
     } else {
       targets = await _setupWorld(scope === 'continent' ? continent : null);
       _removeLayer(usLayer);
       if (!map.hasLayer(worldLayer)) worldLayer.addTo(map);
-      if (scope === 'continent' && CONTINENT_BOUNDS[continent]) {
-        S.pendingView = { type: 'bounds', bounds: CONTINENT_BOUNDS[continent] };
-      } else {
-        S.pendingView = { type: 'view', center: [20, 10], zoom: 2 };
-      }
     }
+
+    _beginRound(targets);
+  }
+
+  /** Compute the map view for the current scope/continent. */
+  function _computeView() {
+    if (S.scope === 'usa') return { type: 'bounds', bounds: [[24, -125], [50, -66]] };
+    if (S.scope === 'continent' && CONTINENT_BOUNDS[S.continent]) {
+      return { type: 'bounds', bounds: CONTINENT_BOUNDS[S.continent] };
+    }
+    return { type: 'view', center: [20, 10], zoom: 2 };
+  }
+
+  /** Start a round on the active layer with the given target list. */
+  function _beginRound(targets) {
+    S.doneCount      = 0;
+    S.mistakes       = 0;
+    S.finished       = false;
+    S.dialogOpen     = false;
+    S.dialogShown    = false;
+    S.lastWrongLayer = null;
+    S.missed         = [];
+    S.current        = null;
+    S.pendingView    = _computeView();
+
+    _el('fillmap-dialog').classList.remove('visible');
+    _el('fillmap-complete').classList.remove('visible');
 
     // Reset styles & "done" flags on the active layer
     S.layer.eachLayer(l => { l.__fmDone = false; l.setStyle(STYLE_DEFAULT); });
@@ -292,6 +304,12 @@ const FillMap = (() => {
       _applyPendingView();
       _nextTarget();
     });
+  }
+
+  /** Replay a round using only the targets missed in the previous round. */
+  function practiceMissed() {
+    if (!S.missed.length) return;
+    _beginRound(S.missed.slice());
   }
 
   function _applyPendingView() {
@@ -343,6 +361,7 @@ const FillMap = (() => {
         targetLayer.bringToFront();
         S.lastWrongLayer = targetLayer;
       }
+      S.missed.push({ key: S.current.key, name: S.current.name });
       S.mistakes++;
       S.doneCount++;
       _updateStats();
@@ -382,6 +401,17 @@ const FillMap = (() => {
     _el('fillmap-complete-stats').innerHTML =
       `<b>${correct}</b> of <b>${S.total}</b> found on the first try (${pct}%)<br>` +
       `<span style="color:var(--text-muted)">${S.mistakes} revealed after a wrong pick</span>`;
+
+    const practiceBtn = _el('fillmap-practice-btn');
+    if (practiceBtn) {
+      if (S.missed.length > 0) {
+        practiceBtn.style.display = '';
+        _el('fillmap-practice-count').textContent = S.missed.length;
+      } else {
+        practiceBtn.style.display = 'none';
+      }
+    }
+
     _el('fillmap-complete').classList.add('visible');
   }
 
@@ -396,6 +426,6 @@ const FillMap = (() => {
 
   return {
     openSetup, setScope, setContinent, startFromSetup,
-    start, restart, continueGame, quit,
+    start, restart, continueGame, practiceMissed, quit,
   };
 })();

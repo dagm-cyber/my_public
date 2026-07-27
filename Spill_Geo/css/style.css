@@ -869,6 +869,11 @@ body {
   justify-content: center;
 }
 
+.fillmap-practice-btn {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
 .fillmap-dialog-btns .btn-primary,
 .fillmap-dialog-btns .btn-secondary {
   flex: 1;

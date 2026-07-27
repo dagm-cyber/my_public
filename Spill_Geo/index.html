@@ -258,6 +258,9 @@
         <span class="feedback-icon fillmap-complete-icon">🏁</span>
         <h3 class="fillmap-complete-title">Map complete!</h3>
         <p class="fillmap-complete-stats" id="fillmap-complete-stats"></p>
+        <button class="btn-primary fillmap-practice-btn" id="fillmap-practice-btn" style="display:none" onclick="FillMap.practiceMissed()">
+          🎯 Practice the ones you missed (<span id="fillmap-practice-count">0</span>)
+        </button>
         <div class="fillmap-dialog-btns">
           <button class="btn-secondary" onclick="App.showScreen('screen-start')">🏠 Home</button>
           <button class="btn-primary" onclick="FillMap.openSetup()">Play Again</button>
