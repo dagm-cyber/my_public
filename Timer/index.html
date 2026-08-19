@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meditasjon Timer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Meditasjon</h1>
+    </header>
+
+    <section class="timer-view" id="timer-view">
+      <div class="duration-picker" id="duration-picker">
+        <div class="duration-chips" id="duration-chips">
+          <button class="chip" data-minutes="5">5</button>
+          <button class="chip" data-minutes="10">10</button>
+          <button class="chip" data-minutes="15">15</button>
+          <button class="chip" data-minutes="20">20</button>
+          <button class="chip chip--active" data-minutes="30">30</button>
+          <button class="chip" data-minutes="45">45</button>
+          <button class="chip" data-minutes="60">60</button>
+        </div>
+        <label class="duration-custom">
+          <input type="number" id="custom-minutes" min="1" max="180" placeholder="Egendefinert (min)">
+        </label>
+      </div>
+
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 240 240">
+          <circle class="ring__track" cx="120" cy="120" r="110"></circle>
+          <circle class="ring__progress" id="ring-progress" cx="120" cy="120" r="110"></circle>
+        </svg>
+        <div class="ring-center">
+          <span class="ring-time" id="ring-time">30:00</span>
+          <span class="ring-phase" id="ring-phase">Klar</span>
+        </div>
+        <button class="control-btn" id="control-btn" aria-label="Start meditasjon">
+          <span id="control-btn-label">Start</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="history-view" id="history-view">
+      <div class="history-header">
+        <h2>Historikk</h2>
+        <button class="link-btn" id="clear-history-btn">Tøm historikk</button>
+      </div>
+      <div class="history-stats" id="history-stats"></div>
+      <ul class="history-list" id="history-list"></ul>
+    </section>
+  </main>
+
+  <audio id="sound-start" src="sound/freesound_community-tibetan-singing-bowl-55786.mp3" preload="auto"></audio>
+  <audio id="sound-end" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" preload="auto"></audio>
+
+  <script src="app.js"></script>
+</body>
+</html>
