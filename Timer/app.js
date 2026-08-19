@@ -63,6 +63,7 @@ els.customMinutes.addEventListener('input', () => {
 
 els.soundSelect.addEventListener('change', () => {
   els.soundBowl.src = els.soundSelect.value;
+  els.soundBowl.load(); // start buffering the new sound immediately, not on first play
 });
 
 function playBowl() {
