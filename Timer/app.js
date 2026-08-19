@@ -24,6 +24,23 @@ let prepStartedAt = null;
 let sessionStartedAt = null;
 let sessionDurationMs = null;
 let tickHandle = null;
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch {
+    wakeLock = null; // e.g. battery saver or unsupported context blocked the request
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) {
+    await wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
+}
 
 function formatTime(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -81,6 +98,7 @@ function stopTick() {
 function startPreparing() {
   phase = 'preparing';
   prepStartedAt = Date.now();
+  acquireWakeLock();
   els.controlBtnLabel.textContent = 'Avbryt';
   els.controlBtn.classList.add('control-btn--stop');
   els.customMinutes.disabled = true;
@@ -144,6 +162,7 @@ function resetToIdle() {
   phase = 'idle';
   sessionStartedAt = null;
   sessionDurationMs = null;
+  releaseWakeLock();
   els.controlBtnLabel.textContent = 'Start';
   els.controlBtn.classList.remove('control-btn--stop');
   els.customMinutes.disabled = false;
@@ -170,6 +189,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     if (phase === 'preparing') tickPreparing();
     else if (phase === 'running') tickRunning();
+    // wake lock is auto-released by the browser when the tab is hidden, so re-acquire it
+    if (phase === 'preparing' || phase === 'running') acquireWakeLock();
   }
 });
 
