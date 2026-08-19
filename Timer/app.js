@@ -13,8 +13,8 @@ const els = {
   historyList: document.getElementById('history-list'),
   historyStats: document.getElementById('history-stats'),
   clearHistoryBtn: document.getElementById('clear-history-btn'),
-  soundStart: document.getElementById('sound-start'),
-  soundEnd: document.getElementById('sound-end'),
+  soundSelect: document.getElementById('sound-select'),
+  soundBowl: document.getElementById('sound-bowl'),
 };
 
 // phase: 'idle' | 'preparing' | 'running' | 'finished'
@@ -61,9 +61,13 @@ els.customMinutes.addEventListener('input', () => {
   }
 });
 
-function playSound(audioEl) {
-  audioEl.currentTime = 0;
-  audioEl.play().catch(() => {}); // autoplay may be blocked before first user gesture
+els.soundSelect.addEventListener('change', () => {
+  els.soundBowl.src = els.soundSelect.value;
+});
+
+function playBowl() {
+  els.soundBowl.currentTime = 0;
+  els.soundBowl.play().catch(() => {}); // autoplay may be blocked before first user gesture
 }
 
 function stopTick() {
@@ -79,6 +83,7 @@ function startPreparing() {
   els.controlBtnLabel.textContent = 'Avbryt';
   els.controlBtn.classList.add('control-btn--stop');
   els.customMinutes.disabled = true;
+  els.soundSelect.disabled = true;
   [...els.chips.children].forEach((c) => (c.disabled = true));
   tickHandle = setInterval(tickPreparing, 200);
   tickPreparing();
@@ -99,7 +104,7 @@ function startRunning() {
   phase = 'running';
   sessionStartedAt = Date.now();
   sessionDurationMs = selectedMinutes * 60 * 1000;
-  playSound(els.soundStart);
+  playBowl();
   els.ringPhase.textContent = 'Mediterer';
   stopTick();
   tickHandle = setInterval(tickRunning, 250);
@@ -120,7 +125,7 @@ function tickRunning() {
 
 function finishSession(completed) {
   stopTick();
-  playSound(els.soundEnd);
+  playBowl();
   const actualSeconds = completed
     ? selectedMinutes * 60
     : Math.round((Date.now() - sessionStartedAt) / 1000);
@@ -141,6 +146,7 @@ function resetToIdle() {
   els.controlBtnLabel.textContent = 'Start';
   els.controlBtn.classList.remove('control-btn--stop');
   els.customMinutes.disabled = false;
+  els.soundSelect.disabled = false;
   [...els.chips.children].forEach((c) => (c.disabled = false));
   els.ringPhase.textContent = 'Klar';
   els.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE);

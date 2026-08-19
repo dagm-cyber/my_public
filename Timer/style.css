@@ -80,6 +80,22 @@ body {
   text-align: center;
 }
 
+.sound-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.sound-picker select {
+  background: var(--bg-elevated);
+  border: 1px solid #2c3444;
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
 .ring-wrap {
   position: relative;
   width: var(--ring-size);

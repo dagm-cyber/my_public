@@ -26,6 +26,13 @@
         <label class="duration-custom">
           <input type="number" id="custom-minutes" min="1" max="180" placeholder="Egendefinert (min)">
         </label>
+        <label class="sound-picker">
+          Bjelle-lyd
+          <select id="sound-select">
+            <option value="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" selected>Kort</option>
+            <option value="sound/freesound_community-tibetan-singing-bowl-55786.mp3">Lang</option>
+          </select>
+        </label>
       </div>
 
       <div class="ring-wrap">
@@ -53,8 +60,7 @@
     </section>
   </main>
 
-  <audio id="sound-start" src="sound/freesound_community-tibetan-singing-bowl-55786.mp3" preload="metadata"></audio>
-  <audio id="sound-end" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" preload="metadata"></audio>
+  <audio id="sound-bowl" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" preload="metadata"></audio>
 
   <script src="app.js"></script>
 </body>
