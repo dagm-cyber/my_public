@@ -86,7 +86,19 @@ els.soundSelect.addEventListener('change', () => {
   els.soundBowl.load(); // start buffering the new sound immediately, not on first play
 });
 
-function playBowl() {
+async function playBowl() {
+  if (els.soundBowl.readyState < HTMLMediaElement.HAVE_METADATA) {
+    await new Promise((resolve) => {
+      const finishLoading = () => {
+        els.soundBowl.removeEventListener('loadedmetadata', finishLoading);
+        els.soundBowl.removeEventListener('error', finishLoading);
+        resolve();
+      };
+      els.soundBowl.addEventListener('loadedmetadata', finishLoading);
+      els.soundBowl.addEventListener('error', finishLoading);
+    });
+  }
+
   els.soundBowl.currentTime = SOUND_START_OFFSETS[els.soundSelect.value] || 0;
   els.soundBowl.play().catch(() => {}); // autoplay may be blocked before first user gesture
 }
