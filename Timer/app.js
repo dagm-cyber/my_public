@@ -1,6 +1,9 @@
 const PREP_SECONDS = 3;
 const RING_CIRCUMFERENCE = 691.15;
 const HISTORY_KEY = 'meditationHistory';
+const SOUND_START_OFFSETS = {
+  'sound/freesound_community-tibetan-singing-bowl-55786.mp3': 15,
+};
 
 const els = {
   chips: document.getElementById('duration-chips'),
@@ -84,7 +87,7 @@ els.soundSelect.addEventListener('change', () => {
 });
 
 function playBowl() {
-  els.soundBowl.currentTime = 0;
+  els.soundBowl.currentTime = SOUND_START_OFFSETS[els.soundSelect.value] || 0;
   els.soundBowl.play().catch(() => {}); // autoplay may be blocked before first user gesture
 }
 
