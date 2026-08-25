@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Mattemesteren</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Start ──────────────────────────────────────────────── -->
+  <div id="screen-start" class="screen active">
+    <div class="screen-content">
+      <h1 class="hero-title">Mattemesteren</h1>
+      <p class="hero-sub">Tren gangetabellen</p>
+
+      <div class="mode-buttons">
+        <button class="mode-btn" onclick="App.startGame('ti-gangen')">
+          <span class="mode-icon">🔟</span>
+          <span class="mode-body">
+            <span class="mode-title">10-gangen</span>
+            <span class="mode-desc">Hele tabellen, 1 × 1 til 10 × 10</span>
+          </span>
+        </button>
+
+        <button class="mode-btn" onclick="App.startGame('de-vanskelige')">
+          <span class="mode-icon">🔥</span>
+          <span class="mode-body">
+            <span class="mode-title">De vanskelige</span>
+            <span class="mode-desc">6-, 7- og 8-gangen</span>
+          </span>
+        </button>
+      </div>
+
+      <button class="btn-ghost" onclick="App.openSettings()">⚙️ Innstillinger</button>
+
+      <div class="best-list" id="start-best-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Innstillinger ──────────────────────────────────────── -->
+  <div id="screen-settings" class="screen">
+    <div class="screen-content">
+      <h2 class="section-title">Innstillinger</h2>
+
+      <div class="setting-block">
+        <span class="setting-label">Tid per oppgave</span>
+        <div class="pill-group" id="timer-pills"></div>
+        <span class="setting-hint">Velg «Av» for øvingsmodus uten tidspress.</span>
+      </div>
+
+      <div class="setting-block">
+        <span class="setting-label">Rekkefølge</span>
+        <div class="pill-group" id="shuffle-pills">
+          <button class="pill" onclick="App.setShuffle(true)" data-shuffle="true">Tilfeldig</button>
+          <button class="pill" onclick="App.setShuffle(false)" data-shuffle="false">I rekkefølge</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="App.goHome()">Ferdig</button>
+    </div>
+  </div>
+
+  <!-- ── Spill ──────────────────────────────────────────────── -->
+  <div id="screen-game" class="screen">
+    <div class="game-header">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="game-meta">
+        <button class="quit-btn" onclick="App.quitGame()">✕ Avslutt</button>
+        <span class="task-counter" id="task-counter">1 / 10</span>
+        <span class="countdown-text" id="countdown-text"></span>
+        <span class="score-badge" id="score-badge">0 riktige</span>
+      </div>
+      <div class="countdown-bar-wrap" id="countdown-bar-wrap">
+        <div class="countdown-bar" id="countdown-bar"></div>
+      </div>
+    </div>
+
+    <div class="game-body">
+      <div class="task-card" id="task-card">
+        <p class="task-text" id="task-text">7 × 10</p>
+        <div class="answer-display" id="answer-display"></div>
+        <p class="feedback-text" id="feedback-text"></p>
+      </div>
+
+      <div class="keypad" id="keypad">
+        <button class="key" onclick="App.pressKey('1')">1</button>
+        <button class="key" onclick="App.pressKey('2')">2</button>
+        <button class="key" onclick="App.pressKey('3')">3</button>
+        <button class="key" onclick="App.pressKey('4')">4</button>
+        <button class="key" onclick="App.pressKey('5')">5</button>
+        <button class="key" onclick="App.pressKey('6')">6</button>
+        <button class="key" onclick="App.pressKey('7')">7</button>
+        <button class="key" onclick="App.pressKey('8')">8</button>
+        <button class="key" onclick="App.pressKey('9')">9</button>
+        <button class="key key-alt" onclick="App.backspace()">⌫</button>
+        <button class="key" onclick="App.pressKey('0')">0</button>
+        <button class="key key-ok" onclick="App.submitAnswer()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Resultat ───────────────────────────────────────────── -->
+  <div id="screen-results" class="screen">
+    <div class="screen-content">
+      <h2 class="section-title" id="results-title">Ferdig!</h2>
+
+      <div class="result-summary">
+        <div class="result-stat">
+          <span class="result-value" id="result-score">0 / 0</span>
+          <span class="result-label">riktige</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-value" id="result-time">0:00</span>
+          <span class="result-label">tid</span>
+        </div>
+      </div>
+
+      <p class="result-best" id="result-best"></p>
+
+      <div class="wrong-list" id="wrong-list"></div>
+
+      <div class="result-actions">
+        <button class="btn-primary" onclick="App.playAgain()">Spill igjen</button>
+        <button class="btn-ghost" onclick="App.goHome()">Meny</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/tables.js"></script>
+  <script src="js/session.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
