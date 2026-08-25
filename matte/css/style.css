@@ -31,7 +31,8 @@ button, input {
 }
 
 /* ── Screens ────────────────────────────────────────────────── */
-.screen { display: none; min-height: 100vh; }
+/* svh = viewport with the browser toolbars expanded, so nothing hides behind them */
+.screen { display: none; min-height: 100vh; min-height: 100svh; }
 .screen.active { display: flex; flex-direction: column; }
 
 .screen-content {
@@ -216,7 +217,7 @@ button, input {
   width: 100%;
   max-width: 540px;
   margin: 0 auto;
-  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+  padding: 16px 16px calc(28px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   justify-content: space-between;
