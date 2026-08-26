@@ -19,7 +19,7 @@ const Tables = (() => {
   const GAMES = [
     {
       id: 'ti-gangen',
-      title: '10-gangen',
+      title: 'Den lille gangetabellen',
       description: '1 × 1 til 10 × 10',
       tasks: _grid(1, 10),
     },
