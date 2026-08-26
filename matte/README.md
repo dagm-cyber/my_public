@@ -7,7 +7,7 @@ build step, no dependencies — plain HTML, CSS and JavaScript, same setup as `S
 
 | Game | Tasks |
 | --- | --- |
-| **10-gangen** | the whole table, 1 × 1 … 10 × 10 (100 tasks) |
+| **Den lille gangetabellen** | the whole table, 1 × 1 … 10 × 10 (100 tasks) |
 | **De vanskelige** | 3 × 6 … 9 × 6, 3 × 7 … 9 × 7, 2 × 8 … 9 × 8 (22 tasks) |
 
 ## Features
