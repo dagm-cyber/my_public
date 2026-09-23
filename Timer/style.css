@@ -77,6 +77,16 @@ body {
   justify-content: center;
 }
 
+/* Narrow phones: two even rows of four instead of an uneven wrap. */
+@media (max-width: 460px) {
+  .duration-chips {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
 .mode-toggle {
   display: flex;
   gap: 8px;
@@ -109,7 +119,7 @@ body {
   background: var(--bg-elevated);
   border: 1px solid transparent;
   color: var(--text-muted);
-  padding: 8px 16px;
+  padding: 8px 13px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.95rem;
