@@ -25,6 +25,7 @@
             <button class="chip" data-minutes="10">10</button>
             <button class="chip" data-minutes="15">15</button>
             <button class="chip" data-minutes="20">20</button>
+            <button class="chip" data-minutes="24">24</button>
             <button class="chip chip--active" data-minutes="30">30</button>
             <button class="chip" data-minutes="45">45</button>
             <button class="chip" data-minutes="60">60</button>
@@ -42,6 +43,13 @@
         </div>
 
         <div class="picker-options" id="guided-options" hidden>
+          <label class="sound-picker">
+            Sorter
+            <select id="guided-sort">
+              <option value="length" selected>Lengde</option>
+              <option value="year">År</option>
+            </select>
+          </label>
           <label class="sound-picker">
             Opptak
             <select id="guided-select"></select>

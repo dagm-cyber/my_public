@@ -1,6 +1,7 @@
 const PREP_SECONDS = 3;
 const RING_CIRCUMFERENCE = 691.15;
 const HISTORY_KEY = 'meditationHistory';
+const PREFS_KEY = 'meditationPrefs';
 const SOUND_START_OFFSETS = {
   'sound/freesound_community-tibetan-singing-bowl-55786.mp3': 15,
 };
@@ -22,6 +23,7 @@ const els = {
   timerOptions: document.getElementById('timer-options'),
   guidedOptions: document.getElementById('guided-options'),
   guidedSelect: document.getElementById('guided-select'),
+  guidedSort: document.getElementById('guided-sort'),
   guidedSource: document.getElementById('guided-source'),
   guidedAudio: document.getElementById('guided-audio'),
 };
@@ -73,12 +75,34 @@ function highlightChip(minutes) {
   });
 }
 
+function loadPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function savePrefs() {
+  localStorage.setItem(
+    PREFS_KEY,
+    JSON.stringify({
+      mode,
+      minutes: selectedMinutes,
+      sound: els.soundSelect.value,
+      guidedSort: els.guidedSort.value,
+      guidedSrc: selectedGuided().src,
+    })
+  );
+}
+
 els.chips.addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip || phase !== 'idle') return;
   els.customMinutes.value = '';
   highlightChip(Number(chip.dataset.minutes));
   setSelectedMinutes(Number(chip.dataset.minutes));
+  savePrefs();
 });
 
 els.customMinutes.addEventListener('input', () => {
@@ -87,6 +111,7 @@ els.customMinutes.addEventListener('input', () => {
   if (value > 0) {
     highlightChip(-1);
     setSelectedMinutes(value);
+    savePrefs();
   }
 });
 
@@ -108,10 +133,39 @@ function guidedDurationSeconds() {
   return Number.isFinite(d) && d > 0 ? d : selectedGuided().seconds;
 }
 
+function heardGuidedSrcs() {
+  return new Set(loadHistory().filter((s) => s.completed && s.guidedSrc).map((s) => s.guidedSrc));
+}
+
+function guidedOption(g, heard) {
+  const i = GUIDED_MEDITATIONS.indexOf(g);
+  const mark = heard.has(g.src) ? '✓ ' : '';
+  return `<option value="${i}">${mark}${guidedLabel(g)} (${Math.round(g.seconds / 60)} min)</option>`;
+}
+
+// sort: 'length' (shortest first) | 'year' (grouped by year, newest first)
 function populateGuidedSelect() {
-  els.guidedSelect.innerHTML = GUIDED_MEDITATIONS.map(
-    (g, i) => `<option value="${i}">${guidedLabel(g)} (${Math.round(g.seconds / 60)} min)</option>`
-  ).join('');
+  const previous = els.guidedSelect.value;
+  const heard = heardGuidedSrcs();
+  const toOption = (g) => guidedOption(g, heard);
+  const byNewest = (a, b) => b.date.localeCompare(a.date);
+  const list = [...GUIDED_MEDITATIONS];
+
+  if (els.guidedSort.value === 'year') {
+    list.sort(byNewest);
+    const years = [...new Set(list.map((g) => g.date.slice(0, 4)))];
+    els.guidedSelect.innerHTML = years
+      .map((year) => {
+        const options = list.filter((g) => g.date.startsWith(year)).map(toOption).join('');
+        return `<optgroup label="${year}">${options}</optgroup>`;
+      })
+      .join('');
+  } else {
+    list.sort((a, b) => a.seconds - b.seconds || byNewest(a, b));
+    els.guidedSelect.innerHTML = list.map(toOption).join('');
+  }
+
+  if (previous !== '') els.guidedSelect.value = previous;
 }
 
 function showSelectedGuided() {
@@ -135,10 +189,20 @@ els.modeToggle.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-mode]');
   if (!btn || phase !== 'idle') return;
   setMode(btn.dataset.mode);
+  savePrefs();
 });
 
 els.guidedSelect.addEventListener('change', () => {
-  if (phase === 'idle') showSelectedGuided();
+  if (phase !== 'idle') return;
+  showSelectedGuided();
+  savePrefs();
+});
+
+els.guidedSort.addEventListener('change', () => {
+  if (phase !== 'idle') return;
+  populateGuidedSelect();
+  showSelectedGuided();
+  savePrefs();
 });
 
 // iOS/Safari only allow play() inside a user gesture, so start the element muted on the Start tap
@@ -209,6 +273,7 @@ els.guidedAudio.addEventListener('error', handleGuidedError);
 els.soundSelect.addEventListener('change', () => {
   els.soundBowl.src = els.soundSelect.value;
   els.soundBowl.load(); // start buffering the new sound immediately, not on first play
+  savePrefs();
 });
 
 async function playBowl() {
@@ -239,6 +304,7 @@ function setControlsDisabled(disabled) {
   els.customMinutes.disabled = disabled;
   els.soundSelect.disabled = disabled;
   els.guidedSelect.disabled = disabled;
+  els.guidedSort.disabled = disabled;
   [...els.chips.children].forEach((c) => (c.disabled = disabled));
   [...els.modeToggle.children].forEach((c) => (c.disabled = disabled));
 }
@@ -314,6 +380,7 @@ function finishSession(completed) {
       plannedMinutes: Math.round(total / 60),
       actualSeconds: Math.round(completed ? total : played),
       guided: `${g.title} · ${guidedLabel(g)}`,
+      guidedSrc: g.src,
     };
   } else {
     playBowl();
@@ -326,6 +393,7 @@ function finishSession(completed) {
   }
   saveSession({ date: new Date().toISOString(), ...session, completed });
   renderHistory();
+  if (mode === 'guided' && completed) populateGuidedSelect();
   resetToIdle();
 }
 
@@ -414,13 +482,37 @@ function renderHistory() {
 }
 
 els.clearHistoryBtn.addEventListener('click', () => {
-  if (confirm('Slette all historikk?')) {
+  if (confirm('Slette all historikk? Merkene for hørte opptak forsvinner også.')) {
     localStorage.removeItem(HISTORY_KEY);
     renderHistory();
+    populateGuidedSelect();
   }
 });
 
-populateGuidedSelect();
-setSelectedMinutes(selectedMinutes);
+function restorePrefs() {
+  const prefs = loadPrefs();
+
+  if ([...els.soundSelect.options].some((o) => o.value === prefs.sound)) {
+    els.soundSelect.value = prefs.sound;
+    els.soundBowl.src = prefs.sound;
+  }
+
+  if (prefs.guidedSort === 'length' || prefs.guidedSort === 'year') els.guidedSort.value = prefs.guidedSort;
+  populateGuidedSelect();
+  const guidedIndex = GUIDED_MEDITATIONS.findIndex((g) => g.src === prefs.guidedSrc);
+  if (guidedIndex >= 0) els.guidedSelect.value = String(guidedIndex);
+
+  const minutes = Number(prefs.minutes);
+  if (minutes > 0 && minutes <= 180) {
+    selectedMinutes = minutes;
+    const isChip = [...els.chips.children].some((c) => Number(c.dataset.minutes) === minutes);
+    els.customMinutes.value = isChip ? '' : String(minutes);
+  }
+  highlightChip(selectedMinutes);
+
+  setMode(prefs.mode === 'guided' ? 'guided' : 'timer');
+}
+
+restorePrefs();
 resetToIdle();
 renderHistory();
