@@ -18,11 +18,20 @@ const els = {
   clearHistoryBtn: document.getElementById('clear-history-btn'),
   soundSelect: document.getElementById('sound-select'),
   soundBowl: document.getElementById('sound-bowl'),
+  modeToggle: document.getElementById('mode-toggle'),
+  timerOptions: document.getElementById('timer-options'),
+  guidedOptions: document.getElementById('guided-options'),
+  guidedSelect: document.getElementById('guided-select'),
+  guidedSource: document.getElementById('guided-source'),
+  guidedAudio: document.getElementById('guided-audio'),
 };
 
 // phase: 'idle' | 'preparing' | 'running' | 'finished'
 let phase = 'idle';
+// mode: 'timer' (silent, bell at start/end) | 'guided' (plays a recording)
+let mode = 'timer';
 let selectedMinutes = 30;
+let guidedUnlock = null;
 let prepStartedAt = null;
 let sessionStartedAt = null;
 let sessionDurationMs = null;
@@ -81,6 +90,122 @@ els.customMinutes.addEventListener('input', () => {
   }
 });
 
+function selectedGuided() {
+  return GUIDED_MEDITATIONS[Number(els.guidedSelect.value)] || GUIDED_MEDITATIONS[0];
+}
+
+function guidedLabel(g) {
+  const date = new Date(`${g.date}T12:00:00`).toLocaleDateString('no-NO', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return `${g.teacher} · ${date}`;
+}
+
+function guidedDurationSeconds() {
+  const d = els.guidedAudio.duration;
+  return Number.isFinite(d) && d > 0 ? d : selectedGuided().seconds;
+}
+
+function populateGuidedSelect() {
+  els.guidedSelect.innerHTML = GUIDED_MEDITATIONS.map(
+    (g, i) => `<option value="${i}">${guidedLabel(g)} (${Math.round(g.seconds / 60)} min)</option>`
+  ).join('');
+}
+
+function showSelectedGuided() {
+  const g = selectedGuided();
+  els.guidedSource.href = g.page;
+  els.guidedSource.textContent = `${g.title} – BSWA`;
+  els.ringTime.textContent = formatTime(g.seconds);
+  els.ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE;
+}
+
+function setMode(newMode) {
+  mode = newMode;
+  [...els.modeToggle.children].forEach((b) => b.classList.toggle('chip--active', b.dataset.mode === mode));
+  els.timerOptions.hidden = mode !== 'timer';
+  els.guidedOptions.hidden = mode !== 'guided';
+  if (mode === 'guided') showSelectedGuided();
+  else setSelectedMinutes(selectedMinutes);
+}
+
+els.modeToggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-mode]');
+  if (!btn || phase !== 'idle') return;
+  setMode(btn.dataset.mode);
+});
+
+els.guidedSelect.addEventListener('change', () => {
+  if (phase === 'idle') showSelectedGuided();
+});
+
+// iOS/Safari only allow play() inside a user gesture, so start the element muted on the Start tap
+// and resume it for real after the preparation countdown.
+function unlockGuidedAudio() {
+  const audio = els.guidedAudio;
+  const g = selectedGuided();
+  if (audio.getAttribute('src') !== g.src) audio.src = g.src;
+  audio.muted = true;
+  guidedUnlock = audio
+    .play()
+    .then(() => audio.pause())
+    .catch(() => {});
+}
+
+async function startGuidedAudio() {
+  const audio = els.guidedAudio;
+  await guidedUnlock;
+  if (phase !== 'running' || mode !== 'guided') return;
+  audio.currentTime = 0;
+  audio.muted = false;
+  const g = selectedGuided();
+  if ('mediaSession' in navigator && 'MediaMetadata' in window) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: g.title,
+      artist: g.teacher,
+      album: 'Buddhist Society of Western Australia',
+    });
+  }
+  try {
+    await audio.play();
+  } catch {
+    handleGuidedError();
+  }
+}
+
+function stopGuidedAudio() {
+  const audio = els.guidedAudio;
+  audio.pause();
+  audio.muted = false;
+}
+
+function handleGuidedError() {
+  if (mode !== 'guided' || (phase !== 'running' && phase !== 'preparing')) return;
+  stopTick();
+  stopGuidedAudio();
+  resetToIdle();
+  els.ringPhase.textContent = 'Kunne ikke spille av';
+}
+
+els.guidedAudio.addEventListener('ended', () => {
+  if (phase === 'running' && mode === 'guided') finishSession(true);
+});
+els.guidedAudio.addEventListener('waiting', () => {
+  if (phase === 'running' && mode === 'guided') els.ringPhase.textContent = 'Laster …';
+});
+els.guidedAudio.addEventListener('playing', () => {
+  if (phase === 'running' && mode === 'guided') els.ringPhase.textContent = 'Mediterer';
+});
+els.guidedAudio.addEventListener('pause', () => {
+  // e.g. paused from the lock screen / headphones
+  if (phase === 'running' && mode === 'guided' && !els.guidedAudio.ended && !els.guidedAudio.muted) {
+    els.ringPhase.textContent = 'Pause';
+  }
+});
+els.guidedAudio.addEventListener('error', handleGuidedError);
+
 els.soundSelect.addEventListener('change', () => {
   els.soundBowl.src = els.soundSelect.value;
   els.soundBowl.load(); // start buffering the new sound immediately, not on first play
@@ -110,15 +235,22 @@ function stopTick() {
   }
 }
 
+function setControlsDisabled(disabled) {
+  els.customMinutes.disabled = disabled;
+  els.soundSelect.disabled = disabled;
+  els.guidedSelect.disabled = disabled;
+  [...els.chips.children].forEach((c) => (c.disabled = disabled));
+  [...els.modeToggle.children].forEach((c) => (c.disabled = disabled));
+}
+
 function startPreparing() {
   phase = 'preparing';
   prepStartedAt = Date.now();
+  if (mode === 'guided') unlockGuidedAudio();
   acquireWakeLock();
   els.controlBtnLabel.textContent = 'Avbryt';
   els.controlBtn.classList.add('control-btn--stop');
-  els.customMinutes.disabled = true;
-  els.soundSelect.disabled = true;
-  [...els.chips.children].forEach((c) => (c.disabled = true));
+  setControlsDisabled(true);
   tickHandle = setInterval(tickPreparing, 200);
   tickPreparing();
 }
@@ -137,38 +269,62 @@ function tickPreparing() {
 function startRunning() {
   phase = 'running';
   sessionStartedAt = Date.now();
-  sessionDurationMs = selectedMinutes * 60 * 1000;
-  playBowl();
-  els.ringPhase.textContent = 'Mediterer';
   stopTick();
+  if (mode === 'guided') {
+    els.ringPhase.textContent = 'Laster …';
+    startGuidedAudio();
+  } else {
+    sessionDurationMs = selectedMinutes * 60 * 1000;
+    playBowl();
+    els.ringPhase.textContent = 'Mediterer';
+  }
   tickHandle = setInterval(tickRunning, 250);
   tickRunning();
 }
 
 function tickRunning() {
-  const elapsedMs = Date.now() - sessionStartedAt;
-  const remainingMs = sessionDurationMs - elapsedMs;
-  if (remainingMs <= 0) {
-    finishSession(true);
-    return;
+  let elapsedSeconds;
+  let totalSeconds;
+  if (mode === 'guided') {
+    // Progress follows the recording itself, so buffering and lock-screen pauses are reflected.
+    elapsedSeconds = els.guidedAudio.muted ? 0 : els.guidedAudio.currentTime;
+    totalSeconds = guidedDurationSeconds();
+  } else {
+    elapsedSeconds = (Date.now() - sessionStartedAt) / 1000;
+    totalSeconds = sessionDurationMs / 1000;
+    if (elapsedSeconds >= totalSeconds) {
+      finishSession(true);
+      return;
+    }
   }
-  els.ringTime.textContent = formatTime(remainingMs / 1000);
-  const fraction = elapsedMs / sessionDurationMs;
+  els.ringTime.textContent = formatTime(totalSeconds - elapsedSeconds);
+  const fraction = Math.min(1, elapsedSeconds / totalSeconds);
   els.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - fraction));
 }
 
 function finishSession(completed) {
   stopTick();
-  playBowl();
-  const actualSeconds = completed
-    ? selectedMinutes * 60
-    : Math.round((Date.now() - sessionStartedAt) / 1000);
-  saveSession({
-    date: new Date().toISOString(),
-    plannedMinutes: selectedMinutes,
-    actualSeconds,
-    completed,
-  });
+  let session;
+  if (mode === 'guided') {
+    const g = selectedGuided();
+    const total = guidedDurationSeconds();
+    const played = els.guidedAudio.muted ? 0 : els.guidedAudio.currentTime;
+    stopGuidedAudio();
+    session = {
+      plannedMinutes: Math.round(total / 60),
+      actualSeconds: Math.round(completed ? total : played),
+      guided: `${g.title} · ${guidedLabel(g)}`,
+    };
+  } else {
+    playBowl();
+    session = {
+      plannedMinutes: selectedMinutes,
+      actualSeconds: completed
+        ? selectedMinutes * 60
+        : Math.round((Date.now() - sessionStartedAt) / 1000),
+    };
+  }
+  saveSession({ date: new Date().toISOString(), ...session, completed });
   renderHistory();
   resetToIdle();
 }
@@ -180,12 +336,10 @@ function resetToIdle() {
   releaseWakeLock();
   els.controlBtnLabel.textContent = 'Start';
   els.controlBtn.classList.remove('control-btn--stop');
-  els.customMinutes.disabled = false;
-  els.soundSelect.disabled = false;
-  [...els.chips.children].forEach((c) => (c.disabled = false));
+  setControlsDisabled(false);
   els.ringPhase.textContent = 'Klar';
   els.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
-  els.ringTime.textContent = formatTime(selectedMinutes * 60);
+  els.ringTime.textContent = formatTime(mode === 'guided' ? selectedGuided().seconds : selectedMinutes * 60);
 }
 
 els.controlBtn.addEventListener('click', () => {
@@ -193,6 +347,7 @@ els.controlBtn.addEventListener('click', () => {
     startPreparing();
   } else if (phase === 'preparing') {
     stopTick();
+    if (mode === 'guided') stopGuidedAudio();
     resetToIdle();
   } else if (phase === 'running') {
     finishSession(false);
@@ -245,11 +400,12 @@ function renderHistory() {
       const timeStr = date.toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' });
       const statusClass = s.completed ? 'history-item__status--completed' : 'history-item__status--aborted';
       const statusLabel = s.completed ? 'Fullført' : 'Avbrutt';
+      const kind = s.guided ? `guidet: ${s.guided}` : `planlagt ${s.plannedMinutes} min`;
       return `
         <li class="history-item">
           <div>
             <div>${formatTime(s.actualSeconds)} <span class="${statusClass}">· ${statusLabel}</span></div>
-            <div class="history-item__meta">${dateStr} ${timeStr} · planlagt ${s.plannedMinutes} min</div>
+            <div class="history-item__meta">${dateStr} ${timeStr} · ${kind}</div>
           </div>
         </li>
       `;
@@ -264,6 +420,7 @@ els.clearHistoryBtn.addEventListener('click', () => {
   }
 });
 
+populateGuidedSelect();
 setSelectedMinutes(selectedMinutes);
 resetToIdle();
 renderHistory();

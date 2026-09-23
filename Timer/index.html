@@ -14,25 +14,43 @@
 
     <section class="timer-view" id="timer-view">
       <div class="duration-picker" id="duration-picker">
-        <div class="duration-chips" id="duration-chips">
-          <button class="chip" data-minutes="5">5</button>
-          <button class="chip" data-minutes="10">10</button>
-          <button class="chip" data-minutes="15">15</button>
-          <button class="chip" data-minutes="20">20</button>
-          <button class="chip chip--active" data-minutes="30">30</button>
-          <button class="chip" data-minutes="45">45</button>
-          <button class="chip" data-minutes="60">60</button>
+        <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Type økt">
+          <button class="chip chip--active" data-mode="timer">Stille</button>
+          <button class="chip" data-mode="guided">Guidet</button>
         </div>
-        <label class="duration-custom">
-          <input type="number" id="custom-minutes" min="1" max="180" placeholder="Egendefinert (min)">
-        </label>
-        <label class="sound-picker">
-          Bjelle-lyd
-          <select id="sound-select">
-            <option value="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" selected>Kort</option>
-            <option value="sound/freesound_community-tibetan-singing-bowl-55786.mp3">Lang</option>
-          </select>
-        </label>
+
+        <div class="picker-options" id="timer-options">
+          <div class="duration-chips" id="duration-chips">
+            <button class="chip" data-minutes="5">5</button>
+            <button class="chip" data-minutes="10">10</button>
+            <button class="chip" data-minutes="15">15</button>
+            <button class="chip" data-minutes="20">20</button>
+            <button class="chip chip--active" data-minutes="30">30</button>
+            <button class="chip" data-minutes="45">45</button>
+            <button class="chip" data-minutes="60">60</button>
+          </div>
+          <label class="duration-custom">
+            <input type="number" id="custom-minutes" min="1" max="180" placeholder="Egendefinert (min)">
+          </label>
+          <label class="sound-picker">
+            Bjelle-lyd
+            <select id="sound-select">
+              <option value="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" selected>Kort</option>
+              <option value="sound/freesound_community-tibetan-singing-bowl-55786.mp3">Lang</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="picker-options" id="guided-options" hidden>
+          <label class="sound-picker">
+            Opptak
+            <select id="guided-select"></select>
+          </label>
+          <p class="guided-credit">
+            <a id="guided-source" href="https://bswa.org/" target="_blank" rel="noopener">Buddhist Society of Western Australia</a>
+            · <a href="https://creativecommons.org/licenses/by-nc-nd/3.0/" target="_blank" rel="noopener">CC BY-NC-ND 3.0</a>
+          </p>
+        </div>
       </div>
 
       <div class="ring-wrap">
@@ -61,7 +79,9 @@
   </main>
 
   <audio id="sound-bowl" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" preload="auto"></audio>
+    <audio id="guided-audio" preload="none"></audio>
 
-  <script src="app.js"></script>
+    <script src="guided-meditations.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
