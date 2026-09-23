@@ -40,6 +40,24 @@
               <option value="sound/freesound_community-tibetan-singing-bowl-55786.mp3">Lang</option>
             </select>
           </label>
+          <div class="interval-picker">
+            <label class="sound-picker">
+              Intervall-bjelle
+              <select id="interval-select">
+                <option value="off" selected>Av</option>
+                <option value="5">Hvert 5. min</option>
+                <option value="10">Hvert 10. min</option>
+                <option value="15">Hvert 15. min</option>
+                <option value="half">Halvveis</option>
+                <option value="custom">Egendefinert</option>
+              </select>
+            </label>
+            <label class="sound-picker" id="interval-custom-label" hidden>
+              hvert
+              <input type="number" id="interval-custom" min="1" max="180" value="7" aria-label="Intervall i minutter">
+              min
+            </label>
+          </div>
         </div>
 
         <div class="picker-options" id="guided-options" hidden>
@@ -87,6 +105,7 @@
   </main>
 
   <audio id="sound-bowl" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746.mp3" preload="auto"></audio>
+  <audio id="sound-interval" src="sound/freesound_community-e-flat-tibetan-singing-bowl-struck-38746-soft.mp3" preload="auto"></audio>
     <audio id="guided-audio" preload="none"></audio>
 
     <script src="guided-meditations.js"></script>

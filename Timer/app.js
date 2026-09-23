@@ -2,6 +2,8 @@ const PREP_SECONDS = 3;
 const RING_CIRCUMFERENCE = 691.15;
 const HISTORY_KEY = 'meditationHistory';
 const PREFS_KEY = 'meditationPrefs';
+const END_BELL_GAP_SECONDS = 30;
+const INTERVAL_BELL_LATE_SECONDS = 10;
 const SOUND_START_OFFSETS = {
   'sound/freesound_community-tibetan-singing-bowl-55786.mp3': 15,
 };
@@ -19,6 +21,10 @@ const els = {
   clearHistoryBtn: document.getElementById('clear-history-btn'),
   soundSelect: document.getElementById('sound-select'),
   soundBowl: document.getElementById('sound-bowl'),
+  soundInterval: document.getElementById('sound-interval'),
+  intervalSelect: document.getElementById('interval-select'),
+  intervalCustom: document.getElementById('interval-custom'),
+  intervalCustomLabel: document.getElementById('interval-custom-label'),
   modeToggle: document.getElementById('mode-toggle'),
   timerOptions: document.getElementById('timer-options'),
   guidedOptions: document.getElementById('guided-options'),
@@ -34,6 +40,8 @@ let phase = 'idle';
 let mode = 'timer';
 let selectedMinutes = 30;
 let guidedUnlock = null;
+let intervalBells = [];
+let nextIntervalBell = 0;
 let prepStartedAt = null;
 let sessionStartedAt = null;
 let sessionDurationMs = null;
@@ -90,6 +98,8 @@ function savePrefs() {
       mode,
       minutes: selectedMinutes,
       sound: els.soundSelect.value,
+      interval: els.intervalSelect.value,
+      intervalCustom: Number(els.intervalCustom.value),
       guidedSort: els.guidedSort.value,
       guidedSrc: selectedGuided().src,
     })
@@ -276,6 +286,19 @@ els.soundSelect.addEventListener('change', () => {
   savePrefs();
 });
 
+function showIntervalCustom() {
+  els.intervalCustomLabel.hidden = els.intervalSelect.value !== 'custom';
+}
+
+els.intervalSelect.addEventListener('change', () => {
+  showIntervalCustom();
+  savePrefs();
+});
+
+els.intervalCustom.addEventListener('input', () => {
+  if (Number(els.intervalCustom.value) > 0) savePrefs();
+});
+
 async function playBowl() {
   if (els.soundBowl.readyState < HTMLMediaElement.HAVE_METADATA) {
     await new Promise((resolve) => {
@@ -303,16 +326,50 @@ function stopTick() {
 function setControlsDisabled(disabled) {
   els.customMinutes.disabled = disabled;
   els.soundSelect.disabled = disabled;
+  els.intervalSelect.disabled = disabled;
+  els.intervalCustom.disabled = disabled;
   els.guidedSelect.disabled = disabled;
   els.guidedSort.disabled = disabled;
   [...els.chips.children].forEach((c) => (c.disabled = disabled));
   [...els.modeToggle.children].forEach((c) => (c.disabled = disabled));
 }
 
+// Returns the seconds into the session at which the soft interval bell rings.
+// Bells that would land within END_BELL_GAP_SECONDS of the end are dropped so they never blur into the end bell.
+function computeIntervalBells(totalSeconds) {
+  const choice = els.intervalSelect.value;
+  if (choice === 'off') return [];
+  if (choice === 'half') return [totalSeconds / 2];
+  const minutes = choice === 'custom' ? Number(els.intervalCustom.value) : Number(choice);
+  if (!(minutes > 0)) return [];
+  const bells = [];
+  for (let t = minutes * 60; t < totalSeconds - END_BELL_GAP_SECONDS; t += minutes * 60) bells.push(t);
+  return bells;
+}
+
+function playIntervalBell() {
+  const bell = els.soundInterval;
+  bell.muted = false;
+  bell.currentTime = 0;
+  bell.play().catch(() => {});
+}
+
 function startPreparing() {
   phase = 'preparing';
   prepStartedAt = Date.now();
   if (mode === 'guided') unlockGuidedAudio();
+  else if (els.intervalSelect.value !== 'off') {
+    // iOS/Safari: allow later interval bells by starting the element inside the Start tap.
+    const bell = els.soundInterval;
+    bell.muted = true;
+    bell
+      .play()
+      .then(() => {
+        bell.pause();
+        bell.muted = false;
+      })
+      .catch(() => {});
+  }
   acquireWakeLock();
   els.controlBtnLabel.textContent = 'Avbryt';
   els.controlBtn.classList.add('control-btn--stop');
@@ -341,6 +398,8 @@ function startRunning() {
     startGuidedAudio();
   } else {
     sessionDurationMs = selectedMinutes * 60 * 1000;
+    intervalBells = computeIntervalBells(selectedMinutes * 60);
+    nextIntervalBell = 0;
     playBowl();
     els.ringPhase.textContent = 'Mediterer';
   }
@@ -362,6 +421,13 @@ function tickRunning() {
       finishSession(true);
       return;
     }
+    let due = false;
+    while (nextIntervalBell < intervalBells.length && elapsedSeconds >= intervalBells[nextIntervalBell]) {
+      // After a throttled/background gap, skip bells that are long overdue instead of ringing late.
+      due = elapsedSeconds - intervalBells[nextIntervalBell] < INTERVAL_BELL_LATE_SECONDS;
+      nextIntervalBell += 1;
+    }
+    if (due) playIntervalBell();
   }
   els.ringTime.textContent = formatTime(totalSeconds - elapsedSeconds);
   const fraction = Math.min(1, elapsedSeconds / totalSeconds);
@@ -496,6 +562,12 @@ function restorePrefs() {
     els.soundSelect.value = prefs.sound;
     els.soundBowl.src = prefs.sound;
   }
+
+  if ([...els.intervalSelect.options].some((o) => o.value === prefs.interval)) {
+    els.intervalSelect.value = prefs.interval;
+  }
+  if (prefs.intervalCustom > 0 && prefs.intervalCustom <= 180) els.intervalCustom.value = String(prefs.intervalCustom);
+  showIntervalCustom();
 
   if (prefs.guidedSort === 'length' || prefs.guidedSort === 'year') els.guidedSort.value = prefs.guidedSort;
   populateGuidedSelect();
