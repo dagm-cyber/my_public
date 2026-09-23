@@ -38,7 +38,7 @@ const els = {
 let phase = 'idle';
 // mode: 'timer' (silent, bell at start/end) | 'guided' (plays a recording)
 let mode = 'timer';
-let selectedMinutes = 30;
+let selectedMinutes = 24;
 let guidedUnlock = null;
 let intervalBells = [];
 let nextIntervalBell = 0;

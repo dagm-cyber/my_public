@@ -77,13 +77,24 @@ body {
   justify-content: center;
 }
 
-/* Narrow phones: two even rows of four instead of an uneven wrap. */
+/* Phones: tighten spacing so all seven presets fit on one row (wraps only on very narrow screens). */
 @media (max-width: 460px) {
   .duration-chips {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    width: 100%;
-    max-width: 300px;
+    gap: 6px;
+  }
+
+  .duration-chips .chip {
+    padding: 8px 11px;
+  }
+}
+
+@media (max-width: 374px) {
+  .duration-chips {
+    gap: 4px;
+  }
+
+  .duration-chips .chip {
+    padding: 8px 8px;
   }
 }
 
@@ -119,7 +130,7 @@ body {
   background: var(--bg-elevated);
   border: 1px solid transparent;
   color: var(--text-muted);
-  padding: 8px 13px;
+  padding: 8px 16px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.95rem;
