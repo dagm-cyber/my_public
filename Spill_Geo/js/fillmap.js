@@ -21,12 +21,40 @@ const FillMap = (() => {
     'Oceania':       [[-50, 110], [ 20, 180]],
   };
 
-  const STYLE_DEFAULT = { fillColor: '#1a3a5c', fillOpacity: 0.45, color: '#3b6fa0', weight: 1 };
-  const STYLE_HOVER   = { fillColor: '#2a5280', fillOpacity: 0.70, color: '#5aaff0', weight: 1.5 };
-  const STYLE_CORRECT = { fillColor: '#16a34a', fillOpacity: 0.9,  color: '#22c55e', weight: 1.5 };
   // Older mistakes: muted dark red. Newest mistake: bright red with a thick glowing border.
-  const STYLE_WRONG        = { fillColor: '#7f1d1d', fillOpacity: 0.7,  color: '#991b1b', weight: 1 };
-  const STYLE_WRONG_LATEST = { fillColor: '#ef4444', fillOpacity: 0.95, color: '#fecaca', weight: 3 };
+  const AREA_STYLES = {
+    default:     { fillColor: '#1a3a5c', fillOpacity: 0.45, color: '#3b6fa0', weight: 1 },
+    hover:       { fillColor: '#2a5280', fillOpacity: 0.70, color: '#5aaff0', weight: 1.5 },
+    correct:     { fillColor: '#16a34a', fillOpacity: 0.9,  color: '#22c55e', weight: 1.5 },
+    wrong:       { fillColor: '#7f1d1d', fillOpacity: 0.7,  color: '#991b1b', weight: 1 },
+    wrongLatest: { fillColor: '#ef4444', fillOpacity: 0.95, color: '#fecaca', weight: 3 },
+  };
+  const LINE_STYLES = {
+    default:     { color: '#3b82c4', opacity: 0.75, weight: 4 },
+    hover:       { color: '#93c5fd', opacity: 1,    weight: 7 },
+    correct:     { color: '#22c55e', opacity: 1,    weight: 5 },
+    wrong:       { color: '#b91c1c', opacity: 0.9,  weight: 5 },
+    wrongLatest: { color: '#ef4444', opacity: 1,    weight: 8 },
+  };
+
+  // Street scopes: static GeoJSON built by tools/build_haugesund_streets.py (OSM data)
+  const STREET_SCOPES = {
+    'haugesund-sentrum': 'data/haugesund-streets-sentrum.json',
+    'haugesund-kommune': 'data/haugesund-streets-kommune.json',
+  };
+  const ZOOM_AREA   = { min: 1,  max: 8 };
+  const ZOOM_STREET = { min: 11, max: 18 };
+  // Clicks/hovers snap to the nearest street within this many pixels
+  const STREET_HIT_PX = 12;
+
+  // Background for street scopes (land, water, green areas, buildings, place names)
+  const CONTEXT_URL = 'data/haugesund-context.json';
+  const CONTEXT_STYLES = {
+    land:      { stroke: false, fillColor: '#1a2638', fillOpacity: 1 },
+    water:     { stroke: false, fillColor: '#0a2440', fillOpacity: 1 },
+    green:     { stroke: false, fillColor: '#173226', fillOpacity: 0.9 },
+    buildings: { color: '#3c4b63', weight: 0.6, fillColor: '#2c3a50', fillOpacity: 1, smoothFactor: 0.5 },
+  };
 
   // Natural Earth country names that differ from our data set → ISO2 code
   const NAME_ALIASES = {
@@ -50,16 +78,24 @@ const FillMap = (() => {
   };
 
   let map        = null;
+  let tileLayer  = null;
   let worldLayer = null;
   let usLayer    = null;
+  const streetLayers = {}; // scope → Leaflet geoJSON layer
+  let streetRenderer = null;
+  let streetHover    = null; // street layer currently highlighted by the pointer
+  let contextLayer   = null; // L.layerGroup with the street-scope background
+  let contextBounds  = null; // area covered by the drawn background
+  let contextLabels  = [];   // [{ marker, minZoom, latlng, w, h }]
 
   // ── Setup screen state ───────────────────────────────────
   const setup = { scope: 'world', continent: 'Europe', langs: ['en'], showLabels: false };
 
   // ── Live game state ──────────────────────────────────────
   const S = {
-    scope:      'world',   // 'world' | 'continent' | 'usa'
+    scope:      'world',   // 'world' | 'continent' | 'usa' | 'haugesund-sentrum' | 'haugesund-kommune'
     continent:  null,
+    styles:     AREA_STYLES,
     layer:      null,      // active Leaflet geoJSON layer
     layerByKey: new Map(), // key → layer for the current target pool
     allTargets: [],        // full target list (for restart)
@@ -123,6 +159,8 @@ const FillMap = (() => {
       b.classList.toggle('active', b.dataset.continent === setup.continent));
     const contSection = _el('fm-continent-section');
     if (contSection) contSection.style.display = setup.scope === 'continent' ? '' : 'none';
+    const streetHint = _el('fm-street-hint');
+    if (streetHint) streetHint.style.display = STREET_SCOPES[setup.scope] ? '' : 'none';
     const labelsCb = _el('fm-show-labels');
     if (labelsCb) labelsCb.checked = setup.showLabels;
   }
@@ -148,22 +186,170 @@ const FillMap = (() => {
       minZoom: 1,
       maxZoom: 8,
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(map);
+
+    map.createPane('fmContext').style.zIndex = 350;  // below the street lines (overlayPane = 400)
+    const labelPane = map.createPane('fmContextLabels');
+    labelPane.style.zIndex = 450;
+    labelPane.style.pointerEvents = 'none';
+    map.on('zoomend', _updateContextLabels);
+    map.on('zoomend', () => {
+      if (_isStreetScope()) S.layer.eachLayer(l => _paint(l, l.__fmState || 'default'));
+    });
+
+    // Street layers are non-interactive; the map resolves the nearest street itself
+    // (canvas hit-testing would pick the topmost line, not the closest one).
+    map.on('mousemove', e => { if (_isStreetScope()) _setStreetHover(_nearestStreet(e.layerPoint)); });
+    map.on('mouseout',  () => { if (_isStreetScope()) _setStreetHover(null); });
+    map.on('click', e => {
+      if (!_isStreetScope()) return;
+      const layer = _nearestStreet(e.layerPoint);
+      if (!layer) return;
+      _onClick(layer);
+      _setStreetHover(layer); // clears the highlight if the wrong-pick dialog opened
+    });
+  }
+
+  function _isStreetScope() {
+    return !!STREET_SCOPES[S.scope] && !!S.layer && map.hasLayer(S.layer);
+  }
+
+  /** Apply a named style ('default' | 'hover' | 'correct' | 'wrong' | 'wrongLatest'). */
+  function _paint(layer, state) {
+    layer.__fmState = state;
+    const st = S.styles[state];
+    layer.setStyle(S.styles === LINE_STYLES ? { ...st, weight: st.weight * _lineScale() } : st);
+  }
+
+  /** Street lines get thinner when zoomed out so the network stays readable. */
+  function _lineScale() {
+    const z = map.getZoom();
+    return z >= 15 ? 1 : z >= 14 ? 0.75 : z >= 13 ? 0.55 : 0.4;
+  }
+
+  async function _ensureContext() {
+    if (contextLayer) return;
+    const res = await fetch(CONTEXT_URL);
+    if (!res.ok) throw new Error(`Failed to load ${CONTEXT_URL}: ${res.status}`);
+    const ctx = await res.json();
+    contextBounds = L.latLngBounds(ctx.bounds);
+
+    const renderer = L.canvas({ pane: 'fmContext' });
+    const polys = (geoms, style) => L.geoJSON(geoms, {
+      renderer, pane: 'fmContext', interactive: false, style: () => ({ ...style }),
+    });
+
+    // Buildings are delta-encoded integer rings (see tools/build_haugesund_map.py)
+    const b = ctx.buildings;
+    const rings = b.rings.map(r => {
+      let x = r[0], y = r[1];
+      const ring = [[b.origin[1] + y / b.scale, b.origin[0] + x / b.scale]];
+      for (let i = 2; i < r.length; i += 2) {
+        x += r[i]; y += r[i + 1];
+        ring.push([b.origin[1] + y / b.scale, b.origin[0] + x / b.scale]);
+      }
+      return [ring];
+    });
+    const buildings = L.polygon(rings, {
+      ...CONTEXT_STYLES.buildings, renderer, pane: 'fmContext', interactive: false,
+    });
+
+    contextLabels = ctx.labels.map(l => ({
+      minZoom: l.minZoom,
+      latlng: L.latLng(l.lat, l.lon),
+      // Rough on-screen size, used to keep labels from overlapping
+      w: l.name.length * (/^(village|suburb|strait|bay)$/.test(l.kind) ? 9.5 : 6.6) + 12,
+      h: /^(village|suburb|strait|bay)$/.test(l.kind) ? 18 : 15,
+      marker: L.marker([l.lat, l.lon], {
+        pane: 'fmContextLabels',
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className: 'fm-ctx-label-anchor',
+          iconSize: null,
+          html: `<span class="fm-ctx-label fm-ctx-${l.kind}">${_escHtml(l.name)}</span>`,
+        }),
+      }),
+    }));
+
+    contextLayer = L.layerGroup([
+      polys(ctx.land, CONTEXT_STYLES.land),
+      polys(ctx.water, CONTEXT_STYLES.water),
+      polys(ctx.green, CONTEXT_STYLES.green),
+      buildings,
+    ], {
+      attribution: 'Haugesund map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    });
+  }
+
+  /** Show the place names that suit the current zoom level, skipping any that would
+   *  overlap a more important one (labels are pre-sorted by importance). */
+  function _updateContextLabels() {
+    const on = !!contextLayer && map.hasLayer(contextLayer);
+    const z  = map.getZoom();
+    const placed = [];
+    contextLabels.forEach(lab => {
+      let show = on && z >= lab.minZoom;
+      if (show) {
+        const p = map.project(lab.latlng, z);
+        const box = { x1: p.x - lab.w / 2, x2: p.x + lab.w / 2, y1: p.y - lab.h / 2, y2: p.y + lab.h / 2 };
+        show = !placed.some(o => box.x1 < o.x2 && box.x2 > o.x1 && box.y1 < o.y2 && box.y2 > o.y1);
+        if (show) placed.push(box);
+      }
+      const { marker } = lab;
+      if (show && !map.hasLayer(marker)) marker.addTo(map);
+      else if (!show && map.hasLayer(marker)) map.removeLayer(marker);
+    });
+  }
+
+  /** Switch between the tile basemap (countries/states) and the drawn Haugesund background. */
+  function _setBackground(streets) {
+    map.getContainer().classList.toggle('fm-street-mode', streets);
+    map.setMaxBounds(streets ? contextBounds : null);
+    if (streets) {
+      if (map.hasLayer(tileLayer)) map.removeLayer(tileLayer);
+      if (!map.hasLayer(contextLayer)) contextLayer.addTo(map);
+    } else {
+      if (contextLayer && map.hasLayer(contextLayer)) map.removeLayer(contextLayer);
+      if (!map.hasLayer(tileLayer)) tileLayer.addTo(map);
+    }
+    _updateContextLabels();
+  }
+
+  function _nearestStreet(layerPoint) {
+    let best = null;
+    let bestDist = STREET_HIT_PX;
+    S.layer.eachLayer(l => {
+      if (!l.__fmKey) return;
+      const p = l.closestLayerPoint(layerPoint);
+      if (p && p.distance <= bestDist) { best = l; bestDist = p.distance; }
+    });
+    return best;
+  }
+
+  function _setStreetHover(layer) {
+    if (S.finished || S.dialogOpen) layer = null;
+    if (streetHover && streetHover !== layer && !streetHover.__fmDone) {
+      _paint(streetHover, 'default');
+    }
+    if (layer && !layer.__fmDone) _paint(layer, 'hover');
+    streetHover = layer;
+    map.getContainer().style.cursor = layer && !layer.__fmDone ? 'pointer' : '';
   }
 
   function _bindFeature(layer) {
     layer.on('mouseover', () => {
       if (S.finished || S.dialogOpen || layer.__fmDone || !layer.__fmKey) return;
-      layer.setStyle(STYLE_HOVER);
+      _paint(layer, 'hover');
     });
     layer.on('mouseout', () => {
       if (layer.__fmDone) return;
-      layer.setStyle(STYLE_DEFAULT);
+      _paint(layer, 'default');
     });
     layer.on('click', () => _onClick(layer));
   }
@@ -192,7 +378,7 @@ const FillMap = (() => {
       const res = await fetch(GEOJSON_URL);
       const geo = await res.json();
       worldLayer = L.geoJSON(geo, {
-        style: () => ({ ...STYLE_DEFAULT }),
+        style: () => ({ ...AREA_STYLES.default }),
         onEachFeature: (f, layer) => _bindFeature(layer),
       });
     }
@@ -223,7 +409,7 @@ const FillMap = (() => {
       const res = await fetch(US_STATES_URL);
       const geo = await res.json();
       usLayer = L.geoJSON(geo, {
-        style: () => ({ ...STYLE_DEFAULT }),
+        style: () => ({ ...AREA_STYLES.default }),
         onEachFeature: (f, layer) => {
           const nm = f.properties?.name || f.properties?.NAME || '';
           layer.__fmName = nm;
@@ -243,6 +429,35 @@ const FillMap = (() => {
       targets.push({ key: nm, name: nm });
     });
     S.layer = usLayer;
+    return targets;
+  }
+
+  async function _setupStreets(scope) {
+    if (!streetLayers[scope]) {
+      const res = await fetch(STREET_SCOPES[scope]);
+      if (!res.ok) throw new Error(`Failed to load ${STREET_SCOPES[scope]}: ${res.status}`);
+      const geo = await res.json();
+      if (!streetRenderer) streetRenderer = L.canvas();
+      streetLayers[scope] = L.geoJSON(geo, {
+        renderer: streetRenderer,
+        interactive: false,
+        style: () => ({ ...LINE_STYLES.default }),
+        onEachFeature: (f, layer) => { layer.__fmName = f.properties?.name || ''; },
+      });
+    }
+
+    const layer = streetLayers[scope];
+    S.layerByKey = new Map();
+    const targets = [];
+    layer.eachLayer(l => {
+      const nm = l.__fmName;
+      l.__fmKey = nm || null;
+      if (!nm) return;
+      S.layerByKey.set(nm, l);
+      l.__fmLabel = nm;
+      targets.push({ key: nm, name: nm });
+    });
+    S.layer = layer;
     return targets;
   }
 
@@ -266,22 +481,30 @@ const FillMap = (() => {
     S.langs      = (setup.langs && setup.langs.length) ? setup.langs : ['en'];
     S.showLabels = !!setup.showLabels;
 
+    const isStreets = !!STREET_SCOPES[scope];
+    S.styles = isStreets ? LINE_STYLES : AREA_STYLES;
+
     let targets;
-    if (scope === 'usa') {
-      targets = await _setupUSA();
-      _removeLayer(worldLayer);
-      if (!map.hasLayer(usLayer)) usLayer.addTo(map);
-    } else {
-      targets = await _setupWorld(scope === 'continent' ? continent : null);
-      _removeLayer(usLayer);
-      if (!map.hasLayer(worldLayer)) worldLayer.addTo(map);
-    }
+    if (scope === 'usa')  targets = await _setupUSA();
+    else if (isStreets)   { await _ensureContext(); targets = await _setupStreets(scope); }
+    else                  targets = await _setupWorld(scope === 'continent' ? continent : null);
+
+    [worldLayer, usLayer, ...Object.values(streetLayers)].forEach(l => {
+      if (l !== S.layer) _removeLayer(l);
+    });
+
+    const zoom = isStreets ? ZOOM_STREET : ZOOM_AREA;
+    map.setMinZoom(zoom.min);
+    map.setMaxZoom(zoom.max);
+    _setBackground(isStreets);
+    if (!map.hasLayer(S.layer)) S.layer.addTo(map);
 
     _beginRound(targets);
   }
 
   /** Compute the map view for the current scope/continent. */
   function _computeView() {
+    if (STREET_SCOPES[S.scope]) return { type: 'bounds', bounds: S.layer.getBounds() };
     if (S.scope === 'usa') return { type: 'bounds', bounds: [[24, -125], [50, -66]] };
     if (S.scope === 'continent' && CONTINENT_BOUNDS[S.continent]) {
       return { type: 'bounds', bounds: CONTINENT_BOUNDS[S.continent] };
@@ -300,12 +523,13 @@ const FillMap = (() => {
     S.missed         = [];
     S.current        = null;
     S.pendingView    = _computeView();
+    streetHover      = null;
 
     _el('fillmap-dialog').classList.remove('visible');
     _el('fillmap-complete').classList.remove('visible');
 
     // Reset styles & "done" flags on the active layer
-    S.layer.eachLayer(l => { l.__fmDone = false; l.setStyle(STYLE_DEFAULT); });
+    S.layer.eachLayer(l => { l.__fmDone = false; _paint(l, 'default'); });
     _applyLabels();
 
     S.allTargets = targets;
@@ -378,7 +602,7 @@ const FillMap = (() => {
     if (layer.__fmKey === S.current.key) {
       // Correct → colour green permanently
       layer.__fmDone = true;
-      layer.setStyle(STYLE_CORRECT);
+      _paint(layer, 'correct');
       _labelLayer(layer);
       S.doneCount++;
       _updateStats();
@@ -388,9 +612,9 @@ const FillMap = (() => {
       const targetLayer = S.layerByKey.get(S.current.key);
       if (targetLayer) {
         // Dim the previous newest mistake so only the latest one stands out
-        if (S.lastWrongLayer) S.lastWrongLayer.setStyle(STYLE_WRONG);
+        if (S.lastWrongLayer) _paint(S.lastWrongLayer, 'wrong');
         targetLayer.__fmDone = true;
-        targetLayer.setStyle(STYLE_WRONG_LATEST);
+        _paint(targetLayer, 'wrongLatest');
         targetLayer.bringToFront();
         _labelLayer(targetLayer);
         S.lastWrongLayer = targetLayer;
@@ -450,7 +674,7 @@ const FillMap = (() => {
   }
 
   function quit() {
-    if (map && S.layer) S.layer.eachLayer(l => { l.__fmDone = false; l.setStyle(STYLE_DEFAULT); });
+    if (map && S.layer) S.layer.eachLayer(l => { l.__fmDone = false; _paint(l, 'default'); });
     S.finished   = true;
     S.dialogOpen = false;
     _el('fillmap-dialog').classList.remove('visible');

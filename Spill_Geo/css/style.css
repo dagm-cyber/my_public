@@ -819,6 +819,82 @@ body {
   display: none;
 }
 
+/* Haugesund street scopes: drawn background instead of map tiles */
+#fillmap-map.fm-street-mode {
+  background: #0a2440; /* sea */
+}
+.fm-ctx-label-anchor {
+  background: none;
+  border: none;
+}
+.fm-ctx-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 11px;
+  color: #a7b4c8;
+  text-shadow: 0 0 3px #0b1628, 0 0 3px #0b1628, 0 1px 2px #000;
+  pointer-events: none;
+  user-select: none;
+}
+.fm-ctx-village,
+.fm-ctx-suburb {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+.fm-ctx-neighbourhood,
+.fm-ctx-hamlet {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8796ad;
+}
+.fm-ctx-island,
+.fm-ctx-islet {
+  font-size: 10px;
+  color: #8796ad;
+}
+.fm-ctx-lake,
+.fm-ctx-bay,
+.fm-ctx-strait {
+  font-style: italic;
+  color: #6fa3d8;
+}
+.fm-ctx-strait,
+.fm-ctx-bay {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+.fm-ctx-landmark,
+.fm-ctx-minor,
+.fm-ctx-school,
+.fm-ctx-sport,
+.fm-ctx-building {
+  color: #e2c48a;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.fm-ctx-minor,
+.fm-ctx-school,
+.fm-ctx-sport,
+.fm-ctx-building {
+  color: #c9b48c;
+  font-weight: 500;
+}
+.fm-ctx-landmark::before,
+.fm-ctx-minor::before,
+.fm-ctx-school::before,
+.fm-ctx-sport::before,
+.fm-ctx-building::before {
+  content: '◆ ';
+  font-size: 8px;
+  vertical-align: 1px;
+}
+
 .fillmap-panel {
   text-align: center;
 }
