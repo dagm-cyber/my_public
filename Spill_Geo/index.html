@@ -40,7 +40,7 @@
       <button class="mode-btn" id="btn-mode-fillmap" onclick="FillMap.openSetup()">
         <span class="mode-flag">🗺️</span>
         <span class="mode-name">Fill the Map</span>
-        <span class="mode-desc">Colour every country or state until the map is full</span>
+        <span class="mode-desc">Colour every country, state or Haugesund street until the map is full</span>
       </button>
       <button class="mode-btn" id="btn-mode-study" onclick="Study.open()">
         <span class="mode-flag">📚</span>
@@ -216,7 +216,14 @@
         <button class="pill-btn active" data-scope="world"     onclick="FillMap.setScope('world')">🌍 World countries</button>
         <button class="pill-btn"        data-scope="continent" onclick="FillMap.setScope('continent')">🧭 One continent</button>
         <button class="pill-btn"        data-scope="usa"       onclick="FillMap.setScope('usa')">🇺🇸 US states</button>
+        <button class="pill-btn"        data-scope="haugesund-sentrum" onclick="FillMap.setScope('haugesund-sentrum')">🏙️ Haugesund sentrum streets</button>
+        <button class="pill-btn"        data-scope="haugesund-kommune" onclick="FillMap.setScope('haugesund-kommune')">🏘️ All Haugesund kommune streets</button>
       </div>
+      <p class="settings-hint" id="fm-street-hint" style="display:none">
+        The map shows buildings, parks, water and landmarks for orientation — street names stay hidden.
+        Zoom in to hit the streets more easily. Sentrum has about 60 streets; the whole kommune has 500+.
+        Map data © OpenStreetMap contributors.
+      </p>
     </div>
 
     <div class="settings-section" id="fm-continent-section" style="display:none">
