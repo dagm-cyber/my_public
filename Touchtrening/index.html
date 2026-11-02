@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <title>Touchtrening</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Start ──────────────────────────────────────────────── -->
+  <div id="screen-start" class="screen active">
+    <div class="wrap">
+      <h1 class="hero-title">Touchtrening</h1>
+      <p class="hero-sub">Lær touch-metoden på norsk tastatur – på norsk og engelsk</p>
+
+      <div class="mode-grid">
+        <button class="mode-btn" data-action="lessons">
+          <span class="mode-icon">🎓</span>
+          <span class="mode-title">Leksjoner</span>
+          <span class="mode-desc">Lær tastene steg for steg, fra grunnstillingen</span>
+        </button>
+        <button class="mode-btn" data-action="words">
+          <span class="mode-icon">🔤</span>
+          <span class="mode-title">Ordøving</span>
+          <span class="mode-desc">Tilfeldige vanlige ord</span>
+        </button>
+        <button class="mode-btn" data-action="text">
+          <span class="mode-icon">📝</span>
+          <span class="mode-title">Setninger</span>
+          <span class="mode-desc">Ekte setninger med store bokstaver og tegn</span>
+        </button>
+        <button class="mode-btn" data-action="weak">
+          <span class="mode-icon">🎯</span>
+          <span class="mode-title">Svake taster</span>
+          <span class="mode-desc">Øv på tastene du bommer mest på</span>
+        </button>
+        <button class="mode-btn" data-action="custom">
+          <span class="mode-icon">📋</span>
+          <span class="mode-title">Egen tekst</span>
+          <span class="mode-desc">Lim inn din egen tekst</span>
+        </button>
+        <button class="mode-btn" data-action="stats">
+          <span class="mode-icon">📊</span>
+          <span class="mode-title">Statistikk</span>
+          <span class="mode-desc">Fart, nøyaktighet og problemtaster</span>
+        </button>
+      </div>
+
+      <div class="settings">
+        <div class="setting-block">
+          <span class="setting-label">Språk</span>
+          <div class="pill-group" data-setting="lang">
+            <button class="pill" data-value="no">Norsk</button>
+            <button class="pill" data-value="en">English</button>
+            <button class="pill" data-value="mix">Begge</button>
+          </div>
+        </div>
+        <div class="setting-block">
+          <span class="setting-label">Lengde (ord/setninger)</span>
+          <div class="pill-group" data-setting="length">
+            <button class="pill" data-value="short">Kort</button>
+            <button class="pill" data-value="long">Lang</button>
+            <button class="pill" data-value="t60">1 min</button>
+            <button class="pill" data-value="t120">2 min</button>
+          </div>
+        </div>
+        <div class="setting-block">
+          <span class="setting-label">Ved feil</span>
+          <div class="pill-group" data-setting="stopOnError">
+            <button class="pill" data-value="true">Stopp til riktig tast</button>
+            <button class="pill" data-value="false">Fortsett (⌫ for å rette)</button>
+          </div>
+        </div>
+        <div class="setting-block">
+          <span class="setting-label">Tastatur på skjermen</span>
+          <div class="pill-group" data-setting="showKeyboard">
+            <button class="pill" data-value="true">Vis</button>
+            <button class="pill" data-value="false">Skjul</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="note">Krever fysisk tastatur med norsk oppsett. Tips: ikke se ned på tastene!</p>
+    </div>
+  </div>
+
+  <!-- ── Leksjoner ──────────────────────────────────────────── -->
+  <div id="screen-lessons" class="screen">
+    <div class="wrap">
+      <div class="top-bar">
+        <button class="btn-ghost" data-action="home">← Meny</button>
+        <h2 class="section-title">Leksjoner</h2>
+        <span></span>
+      </div>
+      <p class="hint">★ = minst 90 % nøyaktighet · ★★ = 95 % · ★★★ = 98 %</p>
+      <div class="lesson-grid" id="lesson-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Egen tekst ─────────────────────────────────────────── -->
+  <div id="screen-custom" class="screen">
+    <div class="wrap">
+      <div class="top-bar">
+        <button class="btn-ghost" data-action="home">← Meny</button>
+        <h2 class="section-title">Egen tekst</h2>
+        <span></span>
+      </div>
+      <textarea id="custom-text" rows="8" placeholder="Lim inn eller skriv teksten du vil øve på …"></textarea>
+      <div class="center">
+        <button class="btn-primary" data-action="start-custom">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Skriving ───────────────────────────────────────────── -->
+  <div id="screen-run" class="screen">
+    <div class="wrap wide">
+      <div class="run-header">
+        <div class="run-title" id="run-title"></div>
+        <div class="run-stats">
+          <div><span id="stat-wpm">0</span><small>ord/min</small></div>
+          <div><span id="stat-acc">100 %</span><small>nøyaktighet</small></div>
+          <div><span id="stat-time">0:00</span><small id="stat-time-label">tid</small></div>
+        </div>
+        <div class="run-actions">
+          <button class="btn-ghost small" data-action="restart" title="Tab">↻ Ny runde <kbd>Tab</kbd></button>
+          <button class="btn-ghost small" data-action="home" title="Esc">✕ Meny <kbd>Esc</kbd></button>
+        </div>
+      </div>
+      <p class="run-tip" id="run-tip"></p>
+      <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="typebox" id="typebox">
+        <div class="typeinner" id="typeinner"></div>
+        <div class="start-overlay" id="start-overlay">Begynn å skrive når du er klar</div>
+      </div>
+      <p class="next-hint" id="next-hint"></p>
+      <div id="run-keyboard-wrap">
+        <div id="run-keyboard"></div>
+        <div class="fingers" id="fingers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Resultat ───────────────────────────────────────────── -->
+  <div id="screen-results" class="screen">
+    <div class="wrap">
+      <h2 class="section-title" id="res-title">Ferdig!</h2>
+      <div class="stars" id="res-stars"></div>
+      <div class="result-summary">
+        <div class="result-stat"><span class="result-value" id="res-wpm">0</span><span class="result-label">ord/min</span></div>
+        <div class="result-stat"><span class="result-value" id="res-acc">0 %</span><span class="result-label">nøyaktighet</span></div>
+        <div class="result-stat"><span class="result-value" id="res-time">0:00</span><span class="result-label">tid</span></div>
+        <div class="result-stat"><span class="result-value" id="res-errors">0</span><span class="result-label">feil</span></div>
+      </div>
+      <p class="result-msg" id="res-msg"></p>
+      <div class="missed" id="res-missed"></div>
+      <div class="result-actions" id="res-actions"></div>
+      <p class="hint">Enter: <span id="res-enter-hint">prøv igjen</span> · Tab: ny runde · Esc: meny</p>
+    </div>
+  </div>
+
+  <!-- ── Statistikk ─────────────────────────────────────────── -->
+  <div id="screen-stats" class="screen">
+    <div class="wrap wide">
+      <div class="top-bar">
+        <button class="btn-ghost" data-action="home">← Meny</button>
+        <h2 class="section-title">Statistikk</h2>
+        <button class="btn-ghost small danger" data-action="reset">Nullstill</button>
+      </div>
+      <div class="result-summary" id="stats-summary"></div>
+      <h3 class="sub-title">Feilkart – jo rødere, jo oftere bommer du</h3>
+      <div id="stats-keyboard"></div>
+      <h3 class="sub-title">Svakeste taster</h3>
+      <div class="missed" id="stats-weak"></div>
+      <h3 class="sub-title">Siste økter</h3>
+      <table class="history" id="stats-history"></table>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/keyboard.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/lessons.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
